@@ -59,7 +59,7 @@ func hijackFederate(apiCtx *apiContext) error {
 		caasNs := "|caasglobal\"}"
 		hjkValue = strings.Replace(hjkValue, "\"}", caasNs, -1)
 
-		log.Debugf("hjk federate[%s - %d] => %s %s", apiCtx.tag, idx, hjkValue)
+		log.Debugf("hjk federate[%s - %d] => %s, apiCtx.tag, idx, hjkValue)
 
 		queries.Add("match[]", hjkValue)
 	}
