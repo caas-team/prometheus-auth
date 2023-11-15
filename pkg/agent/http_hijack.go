@@ -53,10 +53,11 @@ func hijackFederate(apiCtx *apiContext) error {
 
 		log.Debugf("raw federate[%s - %d] => %s", apiCtx.tag, idx, rawValue)
 		hjkValue := modifyExpression(expr, apiCtx.namespaceSet)
-		orJob := " or {__name__job=\"caas-carbon-footprint\"}"
-		log.Debugf("hjk federate[%s - %d] => %s %s", apiCtx.tag, idx, hjkValue, orJob)
+		// orJob := " or {__name__job=\"caas-carbon-footprint\"}"
+		caasNs := "|caasglobal\"}"
+		log.Debugf("hjk federate[%s - %d] => %s %s", apiCtx.tag, idx, hjkValue, caasNs)
 
-		hjkValue = strings.Replace(hjkValue, "}", orJob, -1)
+		hjkValue = strings.Replace(hjkValue, "\"}", caasNs, -1)
 		log.Debugf("hjk value: %s", hjkValue)
 		queries.Add("match[]", hjkValue)
 	}
