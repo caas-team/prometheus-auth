@@ -448,10 +448,11 @@ var SomeNamespacesTokenQueryScenarios = map[string]Scenario{
 				ResultType: parser.ValueTypeMatrix,
 				Result: promql.Matrix{
 					promql.Series{
-						Floats: []promql.FPoint{{
-							T: timestamp.FromTime(start),
-							F: 0,
-						},
+						Floats: []promql.FPoint{
+							{
+								T: timestamp.FromTime(start),
+								F: 0,
+							},
 						},
 						Metric: []labels.Label{
 							{
@@ -1016,7 +1017,7 @@ var MyTokenQueryScenarios = map[string]Scenario{
 		RespBody: &jsonResponseData{
 			Status:    "error",
 			ErrorType: "bad_data",
-			Error:     `1:8: parse error: unexpected right bracket ']'`,
+			Error:     `invalid parameter "query": 1:8: parse error: unexpected right bracket ']'`,
 		},
 	},
 	"query_range - invalid step": {

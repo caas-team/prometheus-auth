@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/caas-team/prometheus-auth/pkg/agent/test"
-	"github.com/prometheus/prometheus/tsdb"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -18,6 +15,10 @@ import (
 	"testing"
 	"time"
 	"unsafe"
+
+	"github.com/caas-team/prometheus-auth/pkg/agent/test"
+	"github.com/go-kit/log"
+	"github.com/prometheus/prometheus/tsdb"
 
 	"github.com/caas-team/prometheus-auth/pkg/data"
 	"github.com/caas-team/prometheus-auth/pkg/kube"
@@ -208,7 +209,6 @@ func getTestCases(t *testing.T) []httpTestCase {
 }
 
 func Test_accessControl(t *testing.T) {
-
 	input := `
 		load 1m
 			test_metric1{namespace="ns-a",foo="bar"}    	0+100x100
@@ -219,15 +219,20 @@ func Test_accessControl(t *testing.T) {
 			test_metric_old                         		1+10x98
 	`
 	storage := promql.LoadedStorage(t, input)
-	engine := promql.NewEngine(promql.EngineOpts{})
+	engine := promql.NewEngine(promql.EngineOpts{
+		Timeout:    5 * time.Second,
+		MaxSamples: 1000,
+	})
 	promql.RunTest(t, input, engine)
 
-	dbDir, err := ioutil.TempDir("", "tsdb-ready")
-	defer os.RemoveAll(dbDir)
+	dbDir, err := os.MkdirTemp("", "tsdb-ready")
+	defer func(path string) {
+		_ = os.RemoveAll(path)
+	}(dbDir)
 
 	require.NoError(t, err)
 
-	webHandler := promweb.New(nil, &promweb.Options{
+	webHandler := promweb.New(log.NewJSONLogger(os.Stderr), &promweb.Options{
 		Context:        context.Background(),
 		ListenAddress:  ":9090",
 		ReadTimeout:    30 * time.Second,
@@ -337,7 +342,7 @@ func startPrometheusWebHandler(t *testing.T, webHandler *promweb.Handler) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
 
-	//Set to ready.
+	// Set to ready.
 	webHandler.SetReady(true)
 
 	resp, err = http.Get("http://localhost:9090/-/healthy")
@@ -437,7 +442,7 @@ func (v ScenarioValidator) Validate(t *testing.T, handler http.Handler) {
 }
 
 func (v ScenarioValidator) executeRequest(t *testing.T, handler http.Handler) *httptest.ResponseRecorder {
-	url := "http://example.org" // base url that federator is expected to be hosted at
+	url := "http://localhost:9090" // base url that federator is expected to be hosted at
 	headers := map[string]string{
 		authorizationHeaderKey: fmt.Sprintf("Bearer %s", v.Token),
 	}
@@ -520,7 +525,7 @@ func (v ScenarioValidator) validateTextBody(t *testing.T, res *httptest.Response
 
 func (v ScenarioValidator) validateProtoBody(t *testing.T, res *httptest.ResponseRecorder) {
 	// proto response -> raw
-	compressedProtoResData, err := ioutil.ReadAll(res.Body)
+	compressedProtoResData, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -640,15 +645,15 @@ func (f *fakeTokenAuth) Authenticate(token string) (authentication.UserInfo, err
 func mockTokenAuth() kube.Tokens {
 	return &fakeTokenAuth{
 		token2UserInfo: map[string]authentication.UserInfo{
-			"myToken": authentication.UserInfo{
+			"myToken": {
 				Username: "myUser",
 				UID:      "cluster-admin",
 			},
-			"someNamespacesToken": authentication.UserInfo{
+			"someNamespacesToken": {
 				Username: "someNamespacesUser",
 				UID:      "project-member",
 			},
-			"noneNamespacesToken": authentication.UserInfo{
+			"noneNamespacesToken": {
 				Username: "noneNamespacesUser",
 				UID:      "cluster-member",
 			},
