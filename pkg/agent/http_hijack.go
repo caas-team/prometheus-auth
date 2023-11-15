@@ -57,6 +57,7 @@ func hijackFederate(apiCtx *apiContext) error {
 		log.Debugf("hjk federate[%s - %d] => %s %s", apiCtx.tag, idx, hjkValue, orJob)
 
 		hjkValue = strings.Replace(hjkValue, "}", orJob, -1)
+		log.Debugf("hjk value: %s", hjkValue)
 		queries.Add("match[]", hjkValue)
 	}
 
