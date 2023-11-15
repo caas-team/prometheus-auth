@@ -55,7 +55,8 @@ func hijackFederate(apiCtx *apiContext) error {
 		orJob := " or caasglobal=\"entsoe\""
 		log.Debugf("hjk federate[%s - %d] => %s %s", apiCtx.tag, idx, hjkValue, orJob)
 
-		queries.Add("match[]", hjkValue+orJob)
+		queries.Add("match[]", hjkValue)
+		queries.Add("match[]", orJob)
 	}
 
 	// inject
