@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/caas-team/prometheus-auth/pkg/data"
@@ -52,11 +53,11 @@ func hijackFederate(apiCtx *apiContext) error {
 
 		log.Debugf("raw federate[%s - %d] => %s", apiCtx.tag, idx, rawValue)
 		hjkValue := modifyExpression(expr, apiCtx.namespaceSet)
-		orJob := " or caasglobal=\"entsoe\""
+		orJob := " or caasglobal=\"entsoe\"}"
 		log.Debugf("hjk federate[%s - %d] => %s %s", apiCtx.tag, idx, hjkValue, orJob)
 
+		hjkValue = strings.Replace(hjkValue, "}", orJob, -1)
 		queries.Add("match[]", hjkValue)
-		queries.Add("match[]", orJob)
 	}
 
 	// inject
