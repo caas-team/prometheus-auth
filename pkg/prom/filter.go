@@ -32,7 +32,7 @@ func FilterLabelMatchers(namespaceSet data.Set, srcMatchers []*prompb.LabelMatch
 
 		if name == namespaceMatchName {
 			translateLabelMatcher(namespaceSet, m)
-			return srcMatchers
+			//return srcMatchers
 		}
 	}
 
