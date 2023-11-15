@@ -37,7 +37,8 @@ func FilterLabelMatchers(namespaceSet data.Set, srcMatchers []*prompb.LabelMatch
 	}
 
 	// append namespace match
-	srcMatchers = append(srcMatchers, createLabelMatcher(namespaceMatchName, namespaceSet.Values()))
+	// append caas clustermetrics label
+	srcMatchers = append(srcMatchers, createLabelMatcher(namespaceMatchName, namespaceSet.Values()), &prompb.LabelMatcher{Name: "caas.telekom.de/clustermetric", Value: "entsoe"})
 
 	return srcMatchers
 }
