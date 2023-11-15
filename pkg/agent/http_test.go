@@ -1,5 +1,3 @@
-//go:build test
-
 package agent
 
 import (
@@ -7,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -19,7 +16,12 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/cockroachdb/cockroach/pkg/util/httputil"
+	"github.com/caas-team/prometheus-auth/pkg/agent/test"
+	"github.com/go-kit/log"
+	"github.com/prometheus/prometheus/tsdb"
+
+	"github.com/caas-team/prometheus-auth/pkg/data"
+	"github.com/caas-team/prometheus-auth/pkg/kube"
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/json-iterator/go"
@@ -27,14 +29,11 @@ import (
 	promapiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/promql"
 	promtsdb "github.com/prometheus/prometheus/tsdb"
 	promweb "github.com/prometheus/prometheus/web"
-	"github.com/rancher/prometheus-auth/pkg/agent/samples"
-	"github.com/rancher/prometheus-auth/pkg/data"
-	"github.com/rancher/prometheus-auth/pkg/kube"
 	"github.com/stretchr/testify/require"
 	authentication "k8s.io/api/authentication/v1"
 )
@@ -53,7 +52,7 @@ type httpTestCase struct {
 	Type       ScenarioType
 	HTTPMethod string
 	Token      string
-	Scenarios  map[string]samples.Scenario
+	Scenarios  map[string]test.Scenario
 }
 
 func getTestCases(t *testing.T) []httpTestCase {
@@ -63,155 +62,154 @@ func getTestCases(t *testing.T) []httpTestCase {
 			Type:       FederateScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "noneNamespacesToken",
-			Scenarios:  samples.NoneNamespacesTokenFederateScenarios,
+			Scenarios:  test.NoneNamespacesTokenFederateScenarios,
 		},
 		{
 			Type:       LabelScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "noneNamespacesToken",
-			Scenarios:  samples.NoneNamespacesTokenLabelScenarios,
+			Scenarios:  test.NoneNamespacesTokenLabelScenarios,
 		},
 		{
 			Type:       QueryScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "noneNamespacesToken",
-			Scenarios:  samples.NoneNamespacesTokenQueryScenarios,
+			Scenarios:  test.NoneNamespacesTokenQueryScenarios,
 		},
 		{
 			Type:       QueryScenario,
 			HTTPMethod: http.MethodPost,
 			Token:      "noneNamespacesToken",
-			Scenarios:  samples.NoneNamespacesTokenQueryScenarios,
+			Scenarios:  test.NoneNamespacesTokenQueryScenarios,
 		},
 		{
 			Type:       ReadScenario,
 			HTTPMethod: http.MethodPost,
 			Token:      "noneNamespacesToken",
-			Scenarios:  samples.NoneNamespacesTokenReadScenarios(t),
+			Scenarios:  test.NoneNamespacesTokenReadScenarios(t),
 		},
 		{
 			Type:       SeriesScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "noneNamespacesToken",
-			Scenarios:  samples.NoneNamespacesTokenSeriesScenarios,
+			Scenarios:  test.NoneNamespacesTokenSeriesScenarios,
 		},
 		// someNamespacesToken
 		{
 			Type:       FederateScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "someNamespacesToken",
-			Scenarios:  samples.SomeNamespacesTokenFederateScenarios,
+			Scenarios:  test.SomeNamespacesTokenFederateScenarios,
 		},
 		{
 			Type:       LabelScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "someNamespacesToken",
-			Scenarios:  samples.SomeNamespacesTokenLabelScenarios,
+			Scenarios:  test.SomeNamespacesTokenLabelScenarios,
 		},
 		{
 			Type:       QueryScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "someNamespacesToken",
-			Scenarios:  samples.SomeNamespacesTokenQueryScenarios,
+			Scenarios:  test.SomeNamespacesTokenQueryScenarios,
 		},
 		{
 			Type:       QueryScenario,
 			HTTPMethod: http.MethodPost,
 			Token:      "someNamespacesToken",
-			Scenarios:  samples.SomeNamespacesTokenQueryScenarios,
+			Scenarios:  test.SomeNamespacesTokenQueryScenarios,
 		},
 		{
 			Type:       ReadScenario,
 			HTTPMethod: http.MethodPost,
 			Token:      "someNamespacesToken",
-			Scenarios:  samples.SomeNamespacesTokenReadScenarios(t),
+			Scenarios:  test.SomeNamespacesTokenReadScenarios(t),
 		},
 		{
 			Type:       SeriesScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "someNamespacesToken",
-			Scenarios:  samples.SomeNamespacesTokenSeriesScenarios,
+			Scenarios:  test.SomeNamespacesTokenSeriesScenarios,
 		},
 		// myToken
 		{
 			Type:       FederateScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "myToken",
-			Scenarios:  samples.MyTokenFederateScenarios,
+			Scenarios:  test.MyTokenFederateScenarios,
 		},
 		{
 			Type:       LabelScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "myToken",
-			Scenarios:  samples.MyTokenLabelScenarios,
+			Scenarios:  test.MyTokenLabelScenarios,
 		},
 		{
 			Type:       QueryScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "myToken",
-			Scenarios:  samples.MyTokenQueryScenarios,
+			Scenarios:  test.MyTokenQueryScenarios,
 		},
 		{
 			Type:       QueryScenario,
 			HTTPMethod: http.MethodPost,
 			Token:      "myToken",
-			Scenarios:  samples.MyTokenQueryScenarios,
+			Scenarios:  test.MyTokenQueryScenarios,
 		},
 		{
 			Type:       ReadScenario,
 			HTTPMethod: http.MethodPost,
 			Token:      "myToken",
-			Scenarios:  samples.MyTokenReadScenarios(t),
+			Scenarios:  test.MyTokenReadScenarios(t),
 		},
 		{
 			Type:       SeriesScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "myToken",
-			Scenarios:  samples.MyTokenSeriesScenarios,
+			Scenarios:  test.MyTokenSeriesScenarios,
 		},
 		// unauthenticated
 		{
 			Type:       FederateScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "unauthenticated",
-			Scenarios:  samples.MyTokenFederateScenarios,
+			Scenarios:  test.MyTokenFederateScenarios,
 		},
 		{
 			Type:       LabelScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "unauthenticated",
-			Scenarios:  samples.MyTokenLabelScenarios,
+			Scenarios:  test.MyTokenLabelScenarios,
 		},
 		{
 			Type:       QueryScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "unauthenticated",
-			Scenarios:  samples.MyTokenQueryScenarios,
+			Scenarios:  test.MyTokenQueryScenarios,
 		},
 		{
 			Type:       QueryScenario,
 			HTTPMethod: http.MethodPost,
 			Token:      "unauthenticated",
-			Scenarios:  samples.MyTokenQueryScenarios,
+			Scenarios:  test.MyTokenQueryScenarios,
 		},
 		{
 			Type:       ReadScenario,
 			HTTPMethod: http.MethodPost,
 			Token:      "unauthenticated",
-			Scenarios:  samples.MyTokenReadScenarios(t),
+			Scenarios:  test.MyTokenReadScenarios(t),
 		},
 		{
 			Type:       SeriesScenario,
 			HTTPMethod: http.MethodGet,
 			Token:      "unauthenticated",
-			Scenarios:  samples.MyTokenSeriesScenarios,
+			Scenarios:  test.MyTokenSeriesScenarios,
 		},
 	}
 }
 
 func Test_accessControl(t *testing.T) {
-	// all namespaceSet : ns-a, ns-b, ns-c
-	suite, err := promql.NewTest(t, `
+	input := `
 		load 1m
 			test_metric1{namespace="ns-a",foo="bar"}    	0+100x100
 			test_metric1{namespace="ns-c",foo="boo"}    	1+0x100
@@ -219,28 +217,28 @@ func Test_accessControl(t *testing.T) {
 			test_metric_without_labels 						1+10x100
 			test_metric_stale                      	 		1+10x99 stale
 			test_metric_old                         		1+10x98
-	`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer suite.Close()
+	`
+	storage := promql.LoadedStorage(t, input)
+	engine := promql.NewEngine(promql.EngineOpts{
+		Timeout:    5 * time.Second,
+		MaxSamples: 1000,
+	})
+	promql.RunTest(t, input, engine)
 
-	if err := suite.Run(); err != nil {
-		t.Fatal(err)
-	}
-
-	dbDir, err := ioutil.TempDir("", "tsdb-ready")
-	defer os.RemoveAll(dbDir)
+	dbDir, err := os.MkdirTemp("", "tsdb-ready")
+	defer func(path string) {
+		_ = os.RemoveAll(path)
+	}(dbDir)
 
 	require.NoError(t, err)
 
-	webHandler := promweb.New(nil, &promweb.Options{
+	webHandler := promweb.New(log.NewJSONLogger(os.Stderr), &promweb.Options{
 		Context:        context.Background(),
 		ListenAddress:  ":9090",
 		ReadTimeout:    30 * time.Second,
 		MaxConnections: 512,
-		Storage:        suite.Storage(),
-		QueryEngine:    suite.QueryEngine(),
+		Storage:        storage,
+		QueryEngine:    engine,
 		ScrapeManager:  nil,
 		RuleManager:    nil,
 		Notifier:       nil,
@@ -252,7 +250,7 @@ func Test_accessControl(t *testing.T) {
 			Path:   "/",
 		},
 		TSDBDir:      dbDir,
-		LocalStorage: &dbAdapter{suite.TSDB()},
+		LocalStorage: &dbAdapter{storage.DB},
 		Version:      &promweb.PrometheusVersion{},
 		Flags:        map[string]string{},
 
@@ -345,7 +343,7 @@ func startPrometheusWebHandler(t *testing.T, webHandler *promweb.Handler) {
 	require.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
 
 	// Set to ready.
-	webHandler.Ready()
+	webHandler.SetReady(true)
 
 	resp, err = http.Get("http://localhost:9090/-/healthy")
 
@@ -409,7 +407,7 @@ type ScenarioValidator struct {
 	Type     ScenarioType
 	Method   string
 	Token    string
-	Scenario *samples.Scenario
+	Scenario *test.Scenario
 }
 
 func (v ScenarioValidator) Validate(t *testing.T, handler http.Handler) {
@@ -444,7 +442,7 @@ func (v ScenarioValidator) Validate(t *testing.T, handler http.Handler) {
 }
 
 func (v ScenarioValidator) executeRequest(t *testing.T, handler http.Handler) *httptest.ResponseRecorder {
-	url := "http://example.org" // base url that federator is expected to be hosted at
+	url := "http://localhost:9090" // base url that federator is expected to be hosted at
 	headers := map[string]string{
 		authorizationHeaderKey: fmt.Sprintf("Bearer %s", v.Token),
 	}
@@ -474,7 +472,7 @@ func (v ScenarioValidator) executeRequest(t *testing.T, handler http.Handler) *h
 		case http.MethodPost:
 			url = fmt.Sprintf("%s/api/v1%s", url, v.Scenario.Endpoint)
 			body = strings.NewReader(v.Scenario.Queries.Encode())
-			headers[httputil.ContentTypeHeader] = "application/x-www-form-urlencoded"
+			headers["Content-Type"] = "application/x-www-form-urlencoded"
 		default:
 			t.Errorf("[%s] [%s] token %q scenario %q: cannot identify URL to send request", v.Type, v.Method, v.Token, v.Name)
 			return nil
@@ -527,7 +525,7 @@ func (v ScenarioValidator) validateTextBody(t *testing.T, res *httptest.Response
 
 func (v ScenarioValidator) validateProtoBody(t *testing.T, res *httptest.ResponseRecorder) {
 	// proto response -> raw
-	compressedProtoResData, err := ioutil.ReadAll(res.Body)
+	compressedProtoResData, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -647,15 +645,15 @@ func (f *fakeTokenAuth) Authenticate(token string) (authentication.UserInfo, err
 func mockTokenAuth() kube.Tokens {
 	return &fakeTokenAuth{
 		token2UserInfo: map[string]authentication.UserInfo{
-			"myToken": authentication.UserInfo{
+			"myToken": {
 				Username: "myUser",
 				UID:      "cluster-admin",
 			},
-			"someNamespacesToken": authentication.UserInfo{
+			"someNamespacesToken": {
 				Username: "someNamespacesUser",
 				UID:      "project-member",
 			},
-			"noneNamespacesToken": authentication.UserInfo{
+			"noneNamespacesToken": {
 				Username: "noneNamespacesUser",
 				UID:      "cluster-member",
 			},
@@ -664,11 +662,11 @@ func mockTokenAuth() kube.Tokens {
 }
 
 type dbAdapter struct {
-	*promtsdb.DB
+	*tsdb.DB
 }
 
-func (a *dbAdapter) Stats(statsByLabelName string) (*promtsdb.Stats, error) {
-	return a.Head().Stats(statsByLabelName), nil
+func (a *dbAdapter) Stats(statsByLabelName string, limit int) (*promtsdb.Stats, error) {
+	return a.Stats(statsByLabelName, limit)
 }
 
 func (a *dbAdapter) WALReplayStatus() (promtsdb.WALReplayStatus, error) {

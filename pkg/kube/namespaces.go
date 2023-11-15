@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/caas-team/prometheus-auth/pkg/data"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/juju/errors"
-	"github.com/rancher/prometheus-auth/pkg/data"
 	log "github.com/sirupsen/logrus"
 	authorization "k8s.io/api/authorization/v1"
 	core "k8s.io/api/core/v1"
@@ -192,6 +192,7 @@ func getProjectID(ns *core.Namespace) (string, bool) {
 		projectIdentifier, exist := ns.Labels["caas.telekom.de/multiprojectkey"]
 		if exist {
 			return projectIdentifier, true
+		}
 		projectID, exist := ns.Labels["field.cattle.io/projectId"]
 		if exist {
 			return projectID, true

@@ -1,15 +1,13 @@
-//go:build test
-
 package prom
 
 import (
 	"fmt"
 	"testing"
 
+	"github.com/caas-team/prometheus-auth/pkg/data"
 	"github.com/juju/errors"
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/promql/parser"
-	"github.com/rancher/prometheus-auth/pkg/data"
 )
 
 var metrics = []struct {
@@ -116,7 +114,6 @@ func fakeNamespaceSet() data.Set {
 func TestFilterMatchers(t *testing.T) {
 	nsSet := fakeNamespaceSet()
 	errs := make([]error, 0, len(metrics))
-
 	for _, c := range metrics {
 		err := walkExpr(c.name, c.input, c.expect, func(matchers []*labels.Matcher) ([]*labels.Matcher, error) {
 			return FilterMatchers(nsSet, matchers), nil

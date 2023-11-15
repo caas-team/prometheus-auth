@@ -1,12 +1,10 @@
-//go:build test
-
-package samples
+package test
 
 import (
 	"net/http"
 	"net/url"
 
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/labels"
 )
 
 var NoneNamespacesTokenSeriesScenarios = map[string]Scenario{

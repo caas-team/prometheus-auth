@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/rancher/prometheus-auth/pkg/agent"
+	"github.com/caas-team/prometheus-auth/pkg/agent"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -67,6 +67,13 @@ func main() {
 		},
 	}
 
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("panic: %v", r)
+			os.Exit(1)
+		}
+	}()
+
 	app.Before = func(context *cli.Context) error {
 		if context.Bool("log.json") {
 			log.SetFormatter(&log.JSONFormatter{})
@@ -88,6 +95,6 @@ func main() {
 	app.Action = agent.Run
 
 	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 }

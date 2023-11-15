@@ -1,15 +1,6 @@
-TARGETS := $(shell ls scripts)
+lint:
+	pre-commit run --all-files
 
-.dapper:
-	@echo Downloading dapper
-	@curl -sL https://releases.rancher.com/dapper/latest/dapper-`uname -s`-`uname -m` > .dapper.tmp
-	@@chmod +x .dapper.tmp
-	@./.dapper.tmp -v
-	@mv .dapper.tmp .dapper
+test:
+	go test -race -count=1 -v ./...
 
-$(TARGETS): .dapper
-	./.dapper $@
-
-.DEFAULT_GOAL := ci
-
-.PHONY: $(TARGETS)

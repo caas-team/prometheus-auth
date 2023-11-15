@@ -8,18 +8,17 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cockroachdb/cockroach/pkg/util/httputil"
+	"github.com/caas-team/prometheus-auth/pkg/data"
+	"github.com/caas-team/prometheus-auth/pkg/prom"
 	"github.com/golang/snappy"
 	"github.com/juju/errors"
 	prommodel "github.com/prometheus/common/model"
-	promlb "github.com/prometheus/prometheus/pkg/labels"
+	promlb "github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/prometheus/prometheus/storage/remote"
 	"github.com/prometheus/prometheus/util/stats"
-	"github.com/rancher/prometheus-auth/pkg/data"
-	"github.com/rancher/prometheus-auth/pkg/prom"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -73,7 +72,7 @@ func hijackFederate(apiCtx *apiContext) error {
 
 func hijackQuery(apiCtx *apiContext) error {
 	req := apiCtx.request
-	apiCtx.response.Header().Set(httputil.ContentTypeHeader, httputil.JSONContentType)
+	apiCtx.response.Header().Set("Content-Type", "application/json")
 
 	// pre check
 	if to := req.FormValue("timeout"); len(to) != 0 {
@@ -96,15 +95,12 @@ func hijackQuery(apiCtx *apiContext) error {
 	// quick response
 	if len(apiCtx.namespaceSet) == 0 {
 		var qs *stats.QueryStats
-		if len(req.FormValue("stats")) != 0 {
-			qs = stats.NewQueryStats(stats.NewQueryTimers())
-		}
 
 		if queryExpr.Type() != parser.ValueTypeScalar {
 			var val parser.Value
 			switch queryExpr.Type() {
 			case parser.ValueTypeVector:
-				val = make(promql.Vector, 0, 0)
+				val = make(promql.Vector, 0)
 			case parser.ValueTypeMatrix:
 				val = promql.Matrix{}
 			default:
@@ -147,7 +143,7 @@ func hijackQuery(apiCtx *apiContext) error {
 
 func hijackQueryRange(apiCtx *apiContext) error {
 	req := apiCtx.request
-	apiCtx.response.Header().Set(httputil.ContentTypeHeader, httputil.JSONContentType)
+	apiCtx.response.Header().Set("Content-Type", "application/json")
 
 	// pre check
 	if to := req.FormValue("timeout"); len(to) != 0 {
@@ -197,9 +193,6 @@ func hijackQueryRange(apiCtx *apiContext) error {
 	// quick response
 	if len(apiCtx.namespaceSet) == 0 {
 		var qs *stats.QueryStats
-		if len(req.FormValue("stats")) != 0 {
-			qs = stats.NewQueryStats(stats.NewQueryTimers())
-		}
 
 		if queryExpr.Type() != parser.ValueTypeScalar {
 			var val parser.Value
@@ -247,7 +240,7 @@ func hijackQueryRange(apiCtx *apiContext) error {
 }
 
 func hijackSeries(apiCtx *apiContext) error {
-	apiCtx.response.Header().Set(httputil.ContentTypeHeader, httputil.JSONContentType)
+	apiCtx.response.Header().Set("Content-Type", "application/json")
 
 	// pre check
 	queries, err := url.ParseQuery(apiCtx.request.URL.RawQuery)
@@ -281,7 +274,7 @@ func hijackSeries(apiCtx *apiContext) error {
 
 	// quick response
 	if len(apiCtx.namespaceSet) == 0 {
-		emptyRespData := make([]promlb.Labels, 0, 0)
+		emptyRespData := make([]promlb.Labels, 0)
 
 		return apiCtx.responseJSON(emptyRespData)
 	}
@@ -371,7 +364,7 @@ func hijackRead(apiCtx *apiContext) error {
 func hijackLabelNamespaces(apiCtx *apiContext) error {
 	// quick response
 	if len(apiCtx.namespaceSet) == 0 {
-		emptyRespData := make([]string, 0, 0)
+		emptyRespData := make([]string, 0)
 
 		return apiCtx.responseJSON(emptyRespData)
 	}
@@ -387,11 +380,11 @@ func hijackLabelNamespaces(apiCtx *apiContext) error {
 }
 
 func hijackLabelName(apiCtx *apiContext) error {
-	apiCtx.response.Header().Set(httputil.ContentTypeHeader, httputil.JSONContentType)
+	apiCtx.response.Header().Set("Content-Type", "application/json")
 
 	// quick response
 	if len(apiCtx.namespaceSet) == 0 {
-		emptyRespData := make([]string, 0, 0)
+		emptyRespData := make([]string, 0)
 
 		return apiCtx.responseJSON(emptyRespData)
 	}
