@@ -11,10 +11,15 @@ jobs:
       - name: Login Build Push
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}" ${MTR}
           VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
           docker build -t ghcr.io/${{ github.repository_owner }}/${IMAGE}/${IMAGE}:${VERSION} .
           docker push ghcr.io/${{ github.repository_owner }}/${IMAGE}/${IMAGE}:${VERSION}
+          docker tag ghcr.io/${{ github.repository_owner }}/${IMAGE}/${IMAGE}:${VERSION} ${MTR}/${REPO}/${IMAGE}:${VERSION}
+          docker push ${MTR}/${REPO}/${IMAGE}:${VERSION}
         env:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+          MTR: mtr.devops.telekom.de
+          REPO: caas/promtheus-auth
           IMAGE: prometheus-auth
