@@ -32,13 +32,12 @@ func FilterLabelMatchers(namespaceSet data.Set, srcMatchers []*prompb.LabelMatch
 
 		if name == namespaceMatchName {
 			translateLabelMatcher(namespaceSet, m)
-			//return srcMatchers
+			return srcMatchers
 		}
 	}
 
 	// append namespace match
-	// append caas clustermetrics label
-	srcMatchers = append(srcMatchers, createLabelMatcher(namespaceMatchName, namespaceSet.Values()), &prompb.LabelMatcher{Name: "caasglobal", Value: "entsoe"})
+	srcMatchers = append(srcMatchers, createLabelMatcher(namespaceMatchName, namespaceSet.Values()))
 
 	return srcMatchers
 }
