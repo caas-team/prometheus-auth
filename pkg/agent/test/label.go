@@ -163,6 +163,7 @@ var MyTokenLabelScenarios = map[string]Scenario{
 		RespBody: &jsonResponseData{
 			Status: "success",
 			Data: []string{
+				"test_cluster_wide_metric",
 				"test_metric1",
 				"test_metric2",
 				"test_metric_old",
@@ -179,6 +180,7 @@ var MyTokenLabelScenarios = map[string]Scenario{
 		RespBody: &jsonResponseData{
 			Status: "success",
 			Data: []string{
+				"caasglobal",
 				"ns-a",
 				"ns-c",
 			},

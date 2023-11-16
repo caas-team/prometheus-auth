@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/caas-team/prometheus-auth/pkg/data"
@@ -52,6 +53,12 @@ func hijackFederate(apiCtx *apiContext) error {
 
 		log.Debugf("raw federate[%s - %d] => %s", apiCtx.tag, idx, rawValue)
 		hjkValue := modifyExpression(expr, apiCtx.namespaceSet)
+
+		// introduce a new label namespace="caasglobal",
+		// all metrics with this label will pass the auth gate
+		caasNs := "|caasglobal\"}"
+		hjkValue = strings.ReplaceAll(hjkValue, "\"}", caasNs)
+
 		log.Debugf("hjk federate[%s - %d] => %s", apiCtx.tag, idx, hjkValue)
 
 		queries.Add("match[]", hjkValue)

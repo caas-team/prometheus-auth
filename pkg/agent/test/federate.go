@@ -104,7 +104,7 @@ var NoneNamespacesTokenFederateScenarios = map[string]Scenario{
 		RespCode: http.StatusOK,
 		RespBody: ``,
 	},
-	"empty none-existing label value matches everything": {
+	"empty non-existing label value matches everything": {
 		Queries: url.Values{
 			"match[]": []string{"{bar='',__name__=~'.+'}"},
 		},
@@ -214,7 +214,9 @@ test_metric1{foo="bar",namespace="ns-a",instance="",prometheus="cluster-level/te
 			"match[]": []string{"{__name__=~'.+'}"},
 		},
 		RespCode: http.StatusOK,
-		RespBody: `# TYPE test_metric1 untyped
+		RespBody: `# TYPE test_cluster_wide_metric untyped
+test_cluster_wide_metric{namespace="caasglobal",instance="",prometheus="cluster-level/test"} 1 6000000
+# TYPE test_metric1 untyped
 test_metric1{foo="bar",namespace="ns-a",instance="",prometheus="cluster-level/test"} 10000 6000000
 `,
 	},
@@ -223,14 +225,18 @@ test_metric1{foo="bar",namespace="ns-a",instance="",prometheus="cluster-level/te
 			"match[]": []string{"{foo='',__name__=~'.+'}"},
 		},
 		RespCode: http.StatusOK,
-		RespBody: ``,
+		RespBody: `# TYPE test_cluster_wide_metric untyped
+test_cluster_wide_metric{namespace="caasglobal",instance="",prometheus="cluster-level/test"} 1 6000000
+`,
 	},
 	"empty none-existing label value matches everything": {
 		Queries: url.Values{
 			"match[]": []string{"{bar='',__name__=~'.+'}"},
 		},
 		RespCode: http.StatusOK,
-		RespBody: `# TYPE test_metric1 untyped
+		RespBody: `# TYPE test_cluster_wide_metric untyped
+test_cluster_wide_metric{namespace="caasglobal",instance="",prometheus="cluster-level/test"} 1 6000000
+# TYPE test_metric1 untyped
 test_metric1{foo="bar",namespace="ns-a",instance="",prometheus="cluster-level/test"} 10000 6000000
 `,
 	},
@@ -353,7 +359,9 @@ test_metric2{foo="boo",instance="",prometheus="cluster-level/test"} 1 6000000
 			"match[]": []string{"{__name__=~'.+'}"},
 		},
 		RespCode: http.StatusOK,
-		RespBody: `# TYPE test_metric1 untyped
+		RespBody: `# TYPE test_cluster_wide_metric untyped
+test_cluster_wide_metric{namespace="caasglobal",instance="",prometheus="cluster-level/test"} 1 6000000
+# TYPE test_metric1 untyped
 test_metric1{foo="bar",namespace="ns-a",instance="",prometheus="cluster-level/test"} 10000 6000000
 test_metric1{foo="boo",namespace="ns-c",instance="",prometheus="cluster-level/test"} 1 6000000
 # TYPE test_metric2 untyped
@@ -369,7 +377,9 @@ test_metric_without_labels{instance="",prometheus="cluster-level/test"} 1001 600
 			"match[]": []string{"{foo='',__name__=~'.+'}"},
 		},
 		RespCode: http.StatusOK,
-		RespBody: `# TYPE test_metric_old untyped
+		RespBody: `# TYPE test_cluster_wide_metric untyped
+test_cluster_wide_metric{namespace="caasglobal",instance="",prometheus="cluster-level/test"} 1 6000000
+# TYPE test_metric_old untyped
 test_metric_old{instance="",prometheus="cluster-level/test"} 981 5880000
 # TYPE test_metric_without_labels untyped
 test_metric_without_labels{instance="",prometheus="cluster-level/test"} 1001 6000000
@@ -380,7 +390,9 @@ test_metric_without_labels{instance="",prometheus="cluster-level/test"} 1001 600
 			"match[]": []string{"{bar='',__name__=~'.+'}"},
 		},
 		RespCode: http.StatusOK,
-		RespBody: `# TYPE test_metric1 untyped
+		RespBody: `# TYPE test_cluster_wide_metric untyped
+test_cluster_wide_metric{namespace="caasglobal",instance="",prometheus="cluster-level/test"} 1 6000000
+# TYPE test_metric1 untyped
 test_metric1{foo="bar",namespace="ns-a",instance="",prometheus="cluster-level/test"} 10000 6000000
 test_metric1{foo="boo",namespace="ns-c",instance="",prometheus="cluster-level/test"} 1 6000000
 # TYPE test_metric2 untyped

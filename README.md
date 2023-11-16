@@ -64,6 +64,25 @@ prometheus-auth --log.debug --proxy-url http://localhost:9090 --listen-address :
 
 `GET` - `/_/metrics` [sample](METRICS)
 
+## Developement
+
+### Testing
+
+The `agent/test` folder contains the various `Scenario` structs for each Hijack method (/federate, /query and so on). Each "case" is split into three sub-cases:
+
+- NoneNamespacesToken: the token used to query the API is not associated with any namespace
+- SomeNamespacesToken: the token used to query the API is associated with some namespaces
+- MyToken: the token used to query the API is associated with all namespaces (i.e. the token is a cluster-admin)
+
+The `http_test.go` file contains the tests themselves, as well as the initialization of the TSDB with the metrics
+present.
+
+To run the tests, you can use the following command:
+
+```bash
+make test
+```
+
 # License
 
 Copyright (c) 2014-2018 [Rancher Labs, Inc.](http://rancher.com)

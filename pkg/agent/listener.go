@@ -3,7 +3,6 @@ package agent
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"strings"
 
@@ -46,7 +45,7 @@ func http2HeaderFieldEqual(nameValuePairs map[string]string) cmux.Matcher {
 			return false
 		}
 
-		framer := http2.NewFramer(ioutil.Discard, r)
+		framer := http2.NewFramer(io.Discard, r)
 		hdec := hpack.NewDecoder(uint32(4<<10), func(hf hpack.HeaderField) {
 			for name, value := range nameValuePairs {
 				matched = strings.EqualFold(hf.Name, name) && hf.Value == value
