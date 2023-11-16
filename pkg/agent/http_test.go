@@ -209,11 +209,13 @@ func getTestCases(t *testing.T) []httpTestCase {
 }
 
 func Test_accessControl(t *testing.T) {
+	// the contents of the prom TSDB
 	input := `
 		load 1m
 			test_metric1{namespace="ns-a",foo="bar"}    	0+100x100
 			test_metric1{namespace="ns-c",foo="boo"}    	1+0x100
 			test_metric2{foo="boo"}    						1+0x100
+			test_cluster_wide_metric{namespace="caasglobal"} 1+0x100
 			test_metric_without_labels 						1+10x100
 			test_metric_stale                      	 		1+10x99 stale
 			test_metric_old                         		1+10x98

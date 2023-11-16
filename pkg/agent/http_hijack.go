@@ -54,10 +54,10 @@ func hijackFederate(apiCtx *apiContext) error {
 		log.Debugf("raw federate[%s - %d] => %s", apiCtx.tag, idx, rawValue)
 		hjkValue := modifyExpression(expr, apiCtx.namespaceSet)
 
-		// introduce a new label namespace="caasglobal", 
+		// introduce a new label namespace="caasglobal",
 		// all metrics with this label will pass the auth gate
 		caasNs := "|caasglobal\"}"
-		hjkValue = strings.Replace(hjkValue, "\"}", caasNs, -1)
+		hjkValue = strings.ReplaceAll(hjkValue, "\"}", caasNs)
 
 		log.Debugf("hjk federate[%s - %d] => %s", apiCtx.tag, idx, hjkValue)
 
