@@ -3,7 +3,6 @@ package agent
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"sync"
 
@@ -143,8 +142,7 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := f(apiCtx)
 	if err == nil {
-		resp, _ := apiCtx.response.(*httptest.ResponseRecorder)
-		log.Debugf("sucessful proxy of request. Len of response: %d", resp.Body.Len())
+		log.Infof("api context response: %v", apiCtx.response)
 		return
 	}
 
