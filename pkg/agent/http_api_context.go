@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 
@@ -142,6 +143,8 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := f(apiCtx)
 	if err == nil {
+		resp, _ := apiCtx.response.(*httptest.ResponseRecorder)
+		log.Debugf("sucessful proxy of request. Len of response: %d", resp.Body.Len())
 		return
 	}
 
@@ -171,8 +174,8 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	contentTypeHeaderValue := w.Header().Get("Content-Type")
 	if !strings.Contains(acceptHeaderValue, "application/json") &&
 		!strings.EqualFold(contentTypeHeaderValue, "application/json") {
-
 		http.Error(w, causeErrMsg, responseCode)
+		log.WithError(err).Errorf("failed to write %q into http response", causeErrMsg)
 		return
 	}
 
@@ -186,7 +189,6 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if marshalErr != nil {
 		log.WithError(err).Errorf("unable to marshal responseData %#v", responseData)
 		http.Error(w, "internal error", http.StatusInternalServerError)
-
 		return
 	}
 
