@@ -142,7 +142,7 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := f(apiCtx)
 	if err == nil {
-		log.Infof("api context response: %v", apiCtx.response)
+		log.Debugf("api context response: %+v", apiCtx.response)
 		return
 	}
 
