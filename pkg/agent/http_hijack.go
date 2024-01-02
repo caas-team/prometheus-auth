@@ -59,7 +59,7 @@ func hijackFederate(apiCtx *apiContext) error {
 
 		log.Debugf("raw federate[%s - %d] => %s", apiCtx.tag, idx, rawValue)
 		hjkValue := modifyExpression(expr, apiCtx.namespaceSet)
-		log.Infof("hjk federate[%s - %d] => %s", apiCtx.tag, idx, hjkValue)
+		log.Debugf("hjk federate[%s - %d] => %s", apiCtx.tag, idx, hjkValue)
 
 		queries.Add("match[]", hjkValue)
 	}
