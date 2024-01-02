@@ -17,9 +17,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
-const (
-	apiContextKey = "_apiContext_"
-)
+type apiContextKeyT string
+
+const apiContextKey apiContextKeyT = "_apiContextKey_"
 
 var (
 	badRequestErr     = errors.BadRequestf("bad_data")
@@ -115,14 +115,6 @@ func (c *apiContext) responseMetrics(data *promgo.MetricFamily) (err error) {
 	return
 }
 
-func (c *apiContext) proxy() error {
-	c.Do(func() {
-		c.proxyHandler.ServeHTTP(c.response, c.request)
-	})
-
-	return nil
-}
-
 func (c *apiContext) proxyWith(request *http.Request) error {
 	c.Do(func() {
 		c.proxyHandler.ServeHTTP(c.response, request)
@@ -142,7 +134,6 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := f(apiCtx)
 	if err == nil {
-		log.Debugf("api context response: %+v", apiCtx.response)
 		return
 	}
 

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/caas-team/prometheus-auth/pkg/data"
@@ -22,6 +21,10 @@ import (
 	"github.com/prometheus/prometheus/util/stats"
 	log "github.com/sirupsen/logrus"
 )
+
+// the global namespace to add to all hijacked queries
+// to allow users to get some global metrics
+const globalNamespace = "caasglobal"
 
 func hijackFederate(apiCtx *apiContext) error {
 	// pre check
@@ -43,6 +46,9 @@ func hijackFederate(apiCtx *apiContext) error {
 		return apiCtx.responseMetrics(nil)
 	}
 
+	ns := append(apiCtx.namespaceSet.Values(), globalNamespace)
+	apiCtx.namespaceSet = data.NewSet(ns...)
+
 	// hijack
 	queries.Del("match[]")
 	for idx, rawValue := range matchFormValues {
@@ -53,13 +59,7 @@ func hijackFederate(apiCtx *apiContext) error {
 
 		log.Debugf("raw federate[%s - %d] => %s", apiCtx.tag, idx, rawValue)
 		hjkValue := modifyExpression(expr, apiCtx.namespaceSet)
-
-		// introduce a new label namespace="caasglobal",
-		// all metrics with this label will pass the auth gate
-		caasNs := "|caasglobal\"}"
-		hjkValue = strings.ReplaceAll(hjkValue, "\"}", caasNs)
-
-		log.Debugf("hjk federate[%s - %d] => %s", apiCtx.tag, idx, hjkValue)
+		log.Infof("hjk federate[%s - %d] => %s", apiCtx.tag, idx, hjkValue)
 
 		queries.Add("match[]", hjkValue)
 	}
@@ -446,7 +446,7 @@ func parseDuration(s string) (time.Duration, error) {
 	return 0, errors.Errorf("cannot parse %q to a valid duration", s)
 }
 
-func modifyExpression(originalExpr parser.Expr, namespaceSet data.Set) (modifiedExpr string) {
+func modifyExpression(originalExpr parser.Expr, namespaceSet data.Set) string {
 	parser.Inspect(originalExpr, func(node parser.Node, _ []parser.Node) error {
 		switch n := node.(type) {
 		case *parser.VectorSelector:
