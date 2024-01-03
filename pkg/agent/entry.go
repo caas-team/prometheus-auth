@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" //nolint: gosec // enable profiler
 	"net/url"
 	"os"
 	"strings"
@@ -55,7 +55,7 @@ func Run(cliContext *cli.Context) {
 	}
 	cfg.proxyURL = proxyURL
 
-	accessTokenPath := "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	accessTokenPath := "/var/run/secrets/kubernetes.io/serviceaccount/token" //nolint: gosec // read token from file
 	accessTokenBytes, err := os.ReadFile(accessTokenPath)
 	if err != nil {
 		log.WithError(err).Panicf("Failed to read token file %q", accessTokenPath)
