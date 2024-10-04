@@ -171,7 +171,6 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	contentTypeHeaderValue := w.Header().Get("Content-Type")
 	if !strings.Contains(acceptHeaderValue, "application/json") &&
 		!strings.EqualFold(contentTypeHeaderValue, "application/json") {
-
 		http.Error(w, causeErrMsg, responseCode)
 		return
 	}

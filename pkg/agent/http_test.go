@@ -24,7 +24,7 @@ import (
 	"github.com/caas-team/prometheus-auth/pkg/kube"
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	promapi "github.com/prometheus/client_golang/api"
 	promapiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
