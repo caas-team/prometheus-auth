@@ -112,7 +112,7 @@ func (n *namespaces) validate(token string) (string, error) {
 			ResourceAttributes: &authorization.ResourceAttributes{
 				Namespace: claimNamespace,
 				Verb:      "view",
-				Group:     "monitoring.cattle.io",
+				Group:     "monitoring.coreos.com",
 				Resource:  "prometheus",
 			},
 			User: sarUser,

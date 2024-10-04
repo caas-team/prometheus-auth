@@ -26,7 +26,6 @@ issues:
     - noctx
     - wrapcheck
     - mnd
-    - 
     path: "_test\\.go"
   max-same-issues: 50
 

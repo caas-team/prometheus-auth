@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/prometheus/prometheus/promql/promqltest"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -220,12 +221,12 @@ func Test_accessControl(t *testing.T) {
 			test_metric_stale                      	 		1+10x99 stale
 			test_metric_old                         		1+10x98
 	`
-	storage := promql.LoadedStorage(t, input)
+	storage := promqltest.LoadedStorage(t, input)
 	engine := promql.NewEngine(promql.EngineOpts{
 		Timeout:    5 * time.Second,
 		MaxSamples: 1000,
 	})
-	promql.RunTest(t, input, engine)
+	promqltest.RunTest(t, input, engine)
 
 	dbDir, err := os.MkdirTemp("", "tsdb-ready")
 	defer func(path string) {
