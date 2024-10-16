@@ -50,10 +50,15 @@ func (n *namespaces) query(token string) (data.Set, error) {
 
 	tokenNamespace, err := n.validate(token)
 	if err != nil {
-		return ret, err
+		return ret, errors.Annotatef(err, "failed validation")
 	}
 
-	nsObj, exist, _ := n.namespaceIndexer.GetByKey(tokenNamespace)
+	nsObj, exist, err := n.namespaceIndexer.GetByKey(tokenNamespace)
+
+	if err != nil {
+		return ret, errors.Annotatef(err, "failed to get namespace")
+	}
+
 	if !exist {
 		return ret, errors.New("unknown namespace of token " + tokenNamespace)
 	}
@@ -118,6 +123,8 @@ func (n *namespaces) validate(token string) (string, error) {
 			User: sarUser,
 		},
 	}
+
+	log.Debugf("sending access review %s", token)
 	reviewResult, err := n.subjectAccessReviewsClient.Create(context.TODO(), sar, meta.CreateOptions{})
 	if err != nil {
 		return "", errors.Annotatef(err, "failed to review token")
