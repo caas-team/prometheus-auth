@@ -112,7 +112,7 @@ func (n *namespaces) validate(token string) (string, error) {
 			ResourceAttributes: &authorization.ResourceAttributes{
 				Namespace: claimNamespace,
 				Verb:      "view",
-				Group:     "monitoring.coreos.com",
+				Group:     "*",
 				Resource:  "prometheus",
 			},
 			User: sarUser,
@@ -124,7 +124,7 @@ func (n *namespaces) validate(token string) (string, error) {
 	}
 
 	if !reviewResult.Status.Allowed || reviewResult.Status.Denied {
-		return "", errors.New("denied token")
+		return "", errors.Annotatef(err, "token is not allowed to access namespace %s: %v", claimNamespace, err)
 	}
 
 	n.reviewResultTTLCache.Add(token, struct{}{}, 5*time.Minute)
