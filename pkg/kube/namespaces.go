@@ -3,8 +3,9 @@ package kube
 import (
 	"context"
 	"fmt"
-	"github.com/juju/errors"
 	"time"
+
+	"github.com/juju/errors"
 
 	"github.com/caas-team/prometheus-auth/pkg/data"
 	"github.com/golang-jwt/jwt/v5"
@@ -54,7 +55,6 @@ func (n *namespaces) query(token string) (data.Set, error) {
 
 	log.Debugf("searching for namespace %q in cache", tokenNamespace)
 	nsObj, exist, err := n.namespaceIndexer.GetByKey(tokenNamespace)
-
 	if err != nil {
 		return ret, errors.Annotatef(err, "failed to get namespace")
 	}
@@ -134,7 +134,6 @@ func (n *namespaces) validate(token string) (string, error) {
 	if reviewResult.Status.Allowed {
 		n.reviewResultTTLCache.Add(token, struct{}{}, 5*time.Minute)
 		return claimNamespace, nil
-
 	}
 
 	// DEPRECATED: this is to ensure backward compatibility with old monitoring.cattle.io group

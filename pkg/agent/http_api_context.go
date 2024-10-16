@@ -17,9 +17,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
-const (
-	apiContextKey = "_apiContext_"
-)
+type apiContextKeyT string
+
+const apiContextKey apiContextKeyT = "_apiContextKey_"
 
 var (
 	badRequestErr     = errors.BadRequestf("bad_data")
@@ -115,14 +115,6 @@ func (c *apiContext) responseMetrics(data *promgo.MetricFamily) (err error) {
 	return
 }
 
-func (c *apiContext) proxy() error {
-	c.Do(func() {
-		c.proxyHandler.ServeHTTP(c.response, c.request)
-	})
-
-	return nil
-}
-
 func (c *apiContext) proxyWith(request *http.Request) error {
 	c.Do(func() {
 		c.proxyHandler.ServeHTTP(c.response, request)
@@ -172,6 +164,7 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !strings.Contains(acceptHeaderValue, "application/json") &&
 		!strings.EqualFold(contentTypeHeaderValue, "application/json") {
 		http.Error(w, causeErrMsg, responseCode)
+		log.WithError(err).Errorf("failed to write %q into http response", causeErrMsg)
 		return
 	}
 
@@ -185,7 +178,6 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if marshalErr != nil {
 		log.WithError(err).Errorf("unable to marshal responseData %#v", responseData)
 		http.Error(w, "internal error", http.StatusInternalServerError)
-
 		return
 	}
 

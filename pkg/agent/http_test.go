@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/prometheus/prometheus/promql/promqltest"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +15,8 @@ import (
 	"testing"
 	"time"
 	"unsafe"
+
+	"github.com/prometheus/prometheus/promql/promqltest"
 
 	"github.com/caas-team/prometheus-auth/pkg/agent/test"
 	"github.com/go-kit/log"
