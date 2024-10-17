@@ -68,7 +68,7 @@ func Run(cliContext *cli.Context) {
 
 	log.Println(cfg)
 
-	reader, err := createAgent(cfg)
+	reader, err := createAgent(context.TODO(), cfg)
 	if err != nil {
 		log.WithError(err).Panic("Failed to create agent")
 	}
@@ -146,10 +146,10 @@ func (a *agent) serve() error {
 	}
 }
 
-func createAgent(cfg *agentConfig) (*agent, error) {
+func createAgent(ctx context.Context, cfg *agentConfig) (*agent, error) {
 	utilruntime.ReallyCrash = false
-	utilruntime.PanicHandlers = []func(interface{}){
-		func(i interface{}) {
+	utilruntime.PanicHandlers = []func(context.Context, interface{}){
+		func(ctx context.Context, i interface{}) {
 			if err, ok := i.(error); ok {
 				log.Error(errors.ErrorStack(err))
 			} else {
@@ -157,8 +157,8 @@ func createAgent(cfg *agentConfig) (*agent, error) {
 			}
 		},
 	}
-	utilruntime.ErrorHandlers = []func(err error){
-		func(err error) {
+	utilruntime.ErrorHandlers = []utilruntime.ErrorHandler{
+		func(ctx context.Context, err error, msg string, args ...interface{}) {
 			log.Error(errors.ErrorStack(err))
 		},
 	}

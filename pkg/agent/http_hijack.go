@@ -23,7 +23,7 @@ import (
 )
 
 // the global namespace to add to all hijacked queries
-// to allow users to get some global metrics
+// to allow users to get some global metrics.
 const globalNamespace = "caasglobal"
 
 func hijackFederate(apiCtx *apiContext) error {

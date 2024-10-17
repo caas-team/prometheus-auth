@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/juju/errors"
+
 	"github.com/caas-team/prometheus-auth/pkg/data"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/juju/errors"
 	log "github.com/sirupsen/logrus"
 	authorization "k8s.io/api/authorization/v1"
 	core "k8s.io/api/core/v1"
@@ -39,9 +40,8 @@ type namespaces struct {
 func (n *namespaces) Query(token string) data.Set {
 	ret, err := n.query(token)
 	if err != nil {
-		log.Warnln("failed to query Namespaces", errors.ErrorStack(err))
+		log.Warnf("failed to query Namespaces: %v", err)
 	}
-
 	return ret
 }
 
@@ -50,10 +50,15 @@ func (n *namespaces) query(token string) (data.Set, error) {
 
 	tokenNamespace, err := n.validate(token)
 	if err != nil {
-		return ret, err
+		return ret, errors.Annotatef(err, "failed validation")
 	}
 
-	nsObj, exist, _ := n.namespaceIndexer.GetByKey(tokenNamespace)
+	log.Debugf("searching for namespace %q in cache", tokenNamespace)
+	nsObj, exist, err := n.namespaceIndexer.GetByKey(tokenNamespace)
+	if err != nil {
+		return ret, errors.Annotatef(err, "failed to get namespace")
+	}
+
 	if !exist {
 		return ret, errors.New("unknown namespace of token " + tokenNamespace)
 	}
@@ -102,6 +107,7 @@ func (n *namespaces) validate(token string) (string, error) {
 
 	_, exist := n.reviewResultTTLCache.Get(token)
 	if exist {
+		log.Debugf("token for ns %q is cached", claimNamespace)
 		return claimNamespace, nil
 	}
 
@@ -112,21 +118,49 @@ func (n *namespaces) validate(token string) (string, error) {
 			ResourceAttributes: &authorization.ResourceAttributes{
 				Namespace: claimNamespace,
 				Verb:      "view",
+				Group:     "monitoring.coreos.com",
+				Resource:  "prometheus",
+			},
+			User: sarUser,
+		},
+	}
+
+	log.Debugf("sending access review for namespace %q", claimNamespace)
+	reviewResult, err := n.subjectAccessReviewsClient.Create(context.TODO(), sar, meta.CreateOptions{})
+	if err != nil {
+		return "", errors.Annotatef(err, "failed to review token")
+	}
+
+	if reviewResult.Status.Allowed {
+		n.reviewResultTTLCache.Add(token, struct{}{}, 5*time.Minute)
+		return claimNamespace, nil
+	}
+
+	// DEPRECATED: this is to ensure backward compatibility with old monitoring.cattle.io group
+	// it'll be removed in the next release.
+	sar = &authorization.SubjectAccessReview{
+		Spec: authorization.SubjectAccessReviewSpec{
+			ResourceAttributes: &authorization.ResourceAttributes{
+				Namespace: claimNamespace,
+				Verb:      "view",
 				Group:     "monitoring.cattle.io",
 				Resource:  "prometheus",
 			},
 			User: sarUser,
 		},
 	}
-	reviewResult, err := n.subjectAccessReviewsClient.Create(context.TODO(), sar, meta.CreateOptions{})
+
+	reviewResult, err = n.subjectAccessReviewsClient.Create(context.TODO(), sar, meta.CreateOptions{})
 	if err != nil {
 		return "", errors.Annotatef(err, "failed to review token")
 	}
-
+	// if this also doesn't validate, return the error
+	// move after error check after removing the second subject access review
 	if !reviewResult.Status.Allowed || reviewResult.Status.Denied {
-		return "", errors.New("denied token")
+		return "", fmt.Errorf("token is not allowed to access namespace %q", claimNamespace)
 	}
 
+	log.Warnf("namespace %q is still using the deprecated monitoring.cattle.io group", claimNamespace)
 	n.reviewResultTTLCache.Add(token, struct{}{}, 5*time.Minute)
 
 	return claimNamespace, nil

@@ -16,6 +16,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/prometheus/prometheus/promql/promqltest"
+
 	"github.com/caas-team/prometheus-auth/pkg/agent/test"
 	"github.com/go-kit/log"
 	"github.com/prometheus/prometheus/tsdb"
@@ -24,7 +26,7 @@ import (
 	"github.com/caas-team/prometheus-auth/pkg/kube"
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	promapi "github.com/prometheus/client_golang/api"
 	promapiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
@@ -220,12 +222,12 @@ func Test_accessControl(t *testing.T) {
 			test_metric_stale                      	 		1+10x99 stale
 			test_metric_old                         		1+10x98
 	`
-	storage := promql.LoadedStorage(t, input)
+	storage := promqltest.LoadedStorage(t, input)
 	engine := promql.NewEngine(promql.EngineOpts{
 		Timeout:    5 * time.Second,
 		MaxSamples: 1000,
 	})
-	promql.RunTest(t, input, engine)
+	promqltest.RunTest(t, input, engine)
 
 	dbDir, err := os.MkdirTemp("", "tsdb-ready")
 	defer func(path string) {
