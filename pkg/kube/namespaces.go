@@ -131,37 +131,16 @@ func (n *namespaces) validate(token string) (string, error) {
 		return "", errors.Annotatef(err, "failed to review token")
 	}
 
+	if !reviewResult.Status.Allowed || reviewResult.Status.Denied {
+		return "", fmt.Errorf("token is not allowed to access namespace %q", claimNamespace)
+	}
+
 	if reviewResult.Status.Allowed {
 		n.reviewResultTTLCache.Add(token, struct{}{}, 5*time.Minute)
 		return claimNamespace, nil
 	}
 
-	// DEPRECATED: this is to ensure backward compatibility with old monitoring.cattle.io group
-	// it'll be removed in the next release.
-	sar = &authorization.SubjectAccessReview{
-		Spec: authorization.SubjectAccessReviewSpec{
-			ResourceAttributes: &authorization.ResourceAttributes{
-				Namespace: claimNamespace,
-				Verb:      "view",
-				Group:     "monitoring.cattle.io",
-				Resource:  "prometheus",
-			},
-			User: sarUser,
-		},
-	}
-
-	reviewResult, err = n.subjectAccessReviewsClient.Create(context.TODO(), sar, meta.CreateOptions{})
-	if err != nil {
-		return "", errors.Annotatef(err, "failed to review token")
-	}
-	// if this also doesn't validate, return the error
-	// move after error check after removing the second subject access review
-	if !reviewResult.Status.Allowed || reviewResult.Status.Denied {
-		return "", fmt.Errorf("token is not allowed to access namespace %q", claimNamespace)
-	}
-
-	log.Warnf("namespace %q is still using the deprecated monitoring.cattle.io group", claimNamespace)
-	n.reviewResultTTLCache.Add(token, struct{}{}, 5*time.Minute)
+	log.Debugf("token is not allowed to access namespace %q, denied: %s", claimNamespace, reviewResult.Status.Reason)
 
 	return claimNamespace, nil
 }

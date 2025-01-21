@@ -1,7 +1,7 @@
 package prom
 
 import (
-	"fmt"
+	"errors"
 
 	promlb "github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/prompb"
@@ -86,7 +86,7 @@ func toLabelMatchers(matchers []*promlb.Matcher) ([]*prompb.LabelMatcher, error)
 		case promlb.MatchNotRegexp:
 			mType = prompb.LabelMatcher_NRE
 		default:
-			return nil, fmt.Errorf("invalid matcher type")
+			return nil, errors.New("invalid matcher type")
 		}
 		pbMatchers = append(pbMatchers, &prompb.LabelMatcher{
 			Type:  mType,
@@ -111,7 +111,7 @@ func fromLabelMatchers(matchers []*prompb.LabelMatcher) ([]*promlb.Matcher, erro
 		case prompb.LabelMatcher_NRE:
 			mtype = promlb.MatchNotRegexp
 		default:
-			return nil, fmt.Errorf("invalid matcher type")
+			return nil, errors.New("invalid matcher type")
 		}
 		matcher, err := promlb.NewMatcher(mtype, matcher.Name, matcher.Value)
 		if err != nil {
