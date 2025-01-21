@@ -330,7 +330,7 @@ func hijackRead(apiCtx *apiContext) error {
 		size := len(rawQueries)
 
 		results := make([]*prompb.QueryResult, 0, size)
-		for i := 0; i < size; i++ {
+		for range size {
 			results = append(results, &prompb.QueryResult{})
 		}
 

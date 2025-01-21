@@ -66,7 +66,7 @@ func (c *apiContext) responseJSON(data interface{}) (err error) {
 		}
 	})
 
-	return
+	return err
 }
 
 func (c *apiContext) responseProto(data proto.Message) (err error) {
@@ -92,7 +92,7 @@ func (c *apiContext) responseProto(data proto.Message) (err error) {
 		}
 	})
 
-	return
+	return err
 }
 
 func (c *apiContext) responseMetrics(data *promgo.MetricFamily) (err error) {
@@ -112,7 +112,7 @@ func (c *apiContext) responseMetrics(data *promgo.MetricFamily) (err error) {
 		}
 	})
 
-	return
+	return err
 }
 
 func (c *apiContext) proxyWith(request *http.Request) error {

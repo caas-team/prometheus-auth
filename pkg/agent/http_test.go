@@ -16,6 +16,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/juju/errors"
 	"github.com/prometheus/prometheus/promql/promqltest"
 
 	"github.com/caas-team/prometheus-auth/pkg/agent/test"
@@ -551,7 +552,7 @@ func (v ScenarioValidator) validateProtoBody(t *testing.T, res *httptest.Respons
 }
 
 func (v ScenarioValidator) validateJSONBody(t *testing.T, res *httptest.ResponseRecorder) {
-	if got, want := string(res.Body.Bytes()), jsonResponseBody(v.Scenario.RespBody); got != want {
+	if got, want := res.Body.String(), jsonResponseBody(v.Scenario.RespBody); got != want {
 		t.Errorf("[%s] [%s] token %q scenario %q: got body\n%s\n, want\n%s\n", v.Type, v.Method, v.Token, v.Name, got, want)
 	}
 }
@@ -641,7 +642,7 @@ type fakeTokenAuth struct {
 func (f *fakeTokenAuth) Authenticate(token string) (authentication.UserInfo, error) {
 	userInfo, ok := f.token2UserInfo[token]
 	if !ok {
-		return userInfo, fmt.Errorf("user is not authenticated")
+		return userInfo, errors.New("user is not authenticated")
 	}
 	return userInfo, nil
 }
