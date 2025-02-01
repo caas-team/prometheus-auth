@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -20,7 +21,6 @@ import (
 	"github.com/prometheus/prometheus/promql/promqltest"
 
 	"github.com/caas-team/prometheus-auth/pkg/agent/test"
-	"github.com/go-kit/log"
 	"github.com/prometheus/prometheus/tsdb"
 
 	"github.com/caas-team/prometheus-auth/pkg/data"
@@ -237,18 +237,18 @@ func Test_accessControl(t *testing.T) {
 
 	require.NoError(t, err)
 
-	webHandler := promweb.New(log.NewJSONLogger(os.Stderr), &promweb.Options{
-		Context:        context.Background(),
-		ListenAddress:  ":9090",
-		ReadTimeout:    30 * time.Second,
-		MaxConnections: 512,
-		Storage:        storage,
-		QueryEngine:    engine,
-		ScrapeManager:  nil,
-		RuleManager:    nil,
-		Notifier:       nil,
-		RoutePrefix:    "/",
-		EnableAdminAPI: true,
+	webHandler := promweb.New(slog.New(slog.NewJSONHandler(os.Stderr, nil)), &promweb.Options{
+		Context:         context.Background(),
+		ListenAddresses: []string{":9090"},
+		ReadTimeout:     30 * time.Second,
+		MaxConnections:  512,
+		Storage:         storage,
+		QueryEngine:     engine,
+		ScrapeManager:   nil,
+		RuleManager:     nil,
+		Notifier:        nil,
+		RoutePrefix:     "/",
+		EnableAdminAPI:  true,
 		ExternalURL: &url.URL{
 			Scheme: "http",
 			Host:   "localhost:9090",
@@ -313,7 +313,7 @@ func Test_accessControl(t *testing.T) {
 }
 
 func startPrometheusWebHandler(t *testing.T, webHandler *promweb.Handler) {
-	l, err := webHandler.Listener()
+	l, err := webHandler.Listeners()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start web listener: %s", err))
 	}
@@ -348,7 +348,7 @@ func startPrometheusWebHandler(t *testing.T, webHandler *promweb.Handler) {
 	require.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
 
 	// Set to ready.
-	webHandler.SetReady(true)
+	webHandler.SetReady(promweb.Ready)
 
 	resp, err = http.Get("http://localhost:9090/-/healthy")
 

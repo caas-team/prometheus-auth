@@ -9,11 +9,10 @@ var NoneNamespacesTokenLabelScenarios = map[string]Scenario{
 		Params: map[string]string{
 			"name": "invalid][query",
 		},
-		RespCode: http.StatusBadRequest,
+		RespCode: http.StatusOK,
 		RespBody: &jsonResponseData{
-			Status:    "error",
-			ErrorType: "bad_data",
-			Error:     `invalid label name: "invalid][query"`,
+			Status: "success",
+			Data:   []string{},
 		},
 	},
 	"__name__": {
@@ -76,11 +75,10 @@ var SomeNamespacesTokenLabelScenarios = map[string]Scenario{
 		Params: map[string]string{
 			"name": "invalid][query",
 		},
-		RespCode: http.StatusBadRequest,
+		RespCode: http.StatusOK,
 		RespBody: &jsonResponseData{
-			Status:    "error",
-			ErrorType: "bad_data",
-			Error:     `invalid label name: "invalid][query"`,
+			Status: "success",
+			Data:   []string{},
 		},
 	},
 	"__name__": {
@@ -148,11 +146,10 @@ var MyTokenLabelScenarios = map[string]Scenario{
 		Params: map[string]string{
 			"name": "invalid][query",
 		},
-		RespCode: http.StatusBadRequest,
+		RespCode: http.StatusOK,
 		RespBody: &jsonResponseData{
-			Status:    "error",
-			ErrorType: "bad_data",
-			Error:     `invalid label name: "invalid][query"`,
+			Status: "success",
+			Data:   []string{},
 		},
 	},
 	"__name__": {
