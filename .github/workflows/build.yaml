@@ -3,8 +3,9 @@ name: build
 on: push
 
 permissions:
-  contents: write
+  contents: read
   packages: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,7 +17,7 @@ jobs:
       - name: Login Build Push
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}" ${MTR}
+          docker login -u="${{ secrets.DOCKER_USERNAME}}" -p="${{ secrets.DOCKER_PASSWORD }}" ${MTR}
           VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
           docker build -t ghcr.io/${{ github.repository_owner }}/${IMAGE}/${IMAGE}:${VERSION} .
           docker push ghcr.io/${{ github.repository_owner }}/${IMAGE}/${IMAGE}:${VERSION}
@@ -26,8 +27,6 @@ jobs:
           cosign sign --key env://COSIGN_KEY --tlog-upload=false ghcr.io/${{ github.repository_owner }}/${IMAGE}/${IMAGE}:${VERSION}
         env:
           COSIGN_KEY: ${{secrets.COSIGN_KEY}}
-          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
-          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
           IMAGE: prometheus-auth
           MTR: mtr.devops.telekom.de
           REPO: caas/prometheus-auth
