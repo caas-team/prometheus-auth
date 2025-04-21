@@ -35,7 +35,7 @@ jobs:
         uses: docker/build-push-action@v5
         id: build-and-push
         with:
-          file: ./docker-image/Dockerfile
+          file: ./Dockerfile
           platforms: linux/amd64
           push: true
           tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}, ${{ env.MTR_REPO }}/${{env.IMAGE_NAME}}:${{ env.IMAGE_TAG }}
