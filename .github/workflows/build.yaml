@@ -58,7 +58,7 @@ jobs:
         # only run when a tag is pushed
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          image-tags: ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}, ${{ env.MTR_REPO }}/${{env.IMAGE_NAME}}:${{ github.ref_name }}
+          image-tags: ${DOCKER_METADATA_OUTPUT_TAGS}
           image-digest: ${{ steps.build-and-push.outputs.digest }}
           cosign-private-key: ${{ secrets.COSIGN_KEY }}
           cosign-password: ""
