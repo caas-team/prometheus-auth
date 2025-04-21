@@ -45,7 +45,8 @@ type jsonResponseData struct {
 	Error     string      `json:"error,omitempty"`
 }
 
-func (c *apiContext) responseJSON(data interface{}) (err error) {
+func (c *apiContext) responseJSON(data interface{}) error {
+	var err error
 	c.Do(func() {
 		resp := c.response
 		resp.Header().Set("Content-Type", "application/json")
@@ -69,7 +70,8 @@ func (c *apiContext) responseJSON(data interface{}) (err error) {
 	return err
 }
 
-func (c *apiContext) responseProto(data proto.Message) (err error) {
+func (c *apiContext) responseProto(data proto.Message) error {
+	var err error
 	c.Do(func() {
 		resp := c.response
 		resp.Header().Set("Content-Type", "application/x-protobuf")
@@ -95,7 +97,8 @@ func (c *apiContext) responseProto(data proto.Message) (err error) {
 	return err
 }
 
-func (c *apiContext) responseMetrics(data *promgo.MetricFamily) (err error) {
+func (c *apiContext) responseMetrics(data *promgo.MetricFamily) error {
+	var err error
 	c.Do(func() {
 		req, resp := c.request, c.response
 
@@ -130,7 +133,7 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown internal error", http.StatusInternalServerError)
 	})
 
-	apiCtx := r.Context().Value(apiContextKey).(*apiContext)
+	apiCtx, _ := r.Context().Value(apiContextKey).(*apiContext)
 
 	err := f(apiCtx)
 	if err == nil {
@@ -140,7 +143,7 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Debug(errors.ErrorStack(err))
 
 	// response error msg
-	causeErrMsg := ""
+	var causeErrMsg string
 	var e *errors.Err
 	switch {
 	case errors.As(err, &e):

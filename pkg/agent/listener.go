@@ -68,7 +68,7 @@ func http2HeaderFieldEqual(nameValuePairs map[string]string) cmux.Matcher {
 					return true
 				}
 
-				if f.FrameHeader.Flags&http2.FlagHeadersEndHeaders != 0 {
+				if f.Flags&http2.FlagHeadersEndHeaders != 0 {
 					return false
 				}
 			}
