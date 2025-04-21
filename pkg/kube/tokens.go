@@ -12,6 +12,11 @@ import (
 	clientAuthentication "k8s.io/client-go/kubernetes/typed/authentication/v1"
 )
 
+const (
+	authenticationCacheTTL = 5 * time.Minute
+	tokensCacheMaxSize     = 1024
+)
+
 type Tokens interface {
 	Authenticate(ctx context.Context, token string) (authentication.UserInfo, error)
 }
@@ -26,7 +31,7 @@ func (t *tokens) Authenticate(ctx context.Context, token string) (authentication
 
 	userInfoInterface, exist := t.reviewResultTTLCache.Get(token)
 	if exist {
-		userInfo = userInfoInterface.(authentication.UserInfo)
+		userInfo, _ = userInfoInterface.(authentication.UserInfo)
 		return userInfo, nil
 	}
 
@@ -38,7 +43,7 @@ func (t *tokens) Authenticate(ctx context.Context, token string) (authentication
 	if !tokenReview.Status.Authenticated {
 		return userInfo, fmt.Errorf("user is not authenticated: %s", tokenReview.Status.Error)
 	}
-	t.reviewResultTTLCache.Add(token, userInfo, 5*time.Minute)
+	t.reviewResultTTLCache.Add(token, userInfo, authenticationCacheTTL)
 	return userInfo, nil
 }
 
@@ -50,10 +55,10 @@ func toTokenReview(token string) *authentication.TokenReview {
 	}
 }
 
-func NewTokens(_ context.Context, k8sClient kubernetes.Interface) Tokens {
+func NewTokens(k8sClient kubernetes.Interface) Tokens {
 	return &tokens{
 		tokenReviewClient:    k8sClient.AuthenticationV1().TokenReviews(),
-		reviewResultTTLCache: cache.NewLRUExpireCache(1024),
+		reviewResultTTLCache: cache.NewLRUExpireCache(tokensCacheMaxSize),
 	}
 }
 

@@ -31,6 +31,8 @@ func main() {
         secrets,                  []                 []                   [list,watch,get]
         selfsubjectaccessreviews  []                 []                   [create]`
 
+	const readTimeout = 5 * time.Minute
+	const maxConnections = 512
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "log.json",
@@ -53,12 +55,12 @@ func main() {
 		cli.DurationFlag{
 			Name:  "read-timeout",
 			Usage: "[optional] Maximum duration before timing out read of the request, and closing idle connections",
-			Value: 5 * time.Minute,
+			Value: readTimeout,
 		},
 		cli.IntFlag{
 			Name:  "max-connections",
 			Usage: "[optional] Maximum number of simultaneous connections",
-			Value: 512,
+			Value: maxConnections,
 		},
 		cli.StringSliceFlag{
 			Name:  "filter-reader-labels",
@@ -83,8 +85,8 @@ func main() {
 
 		if context.Bool("log.debug") {
 			log.SetLevel(log.DebugLevel)
-			runtime.SetBlockProfileRate(20)
-			runtime.SetMutexProfileFraction(20)
+			runtime.SetBlockProfileRate(20)     //nolint:mnd // debug statement
+			runtime.SetMutexProfileFraction(20) //nolint:mnd // debug statement
 		}
 
 		log.SetOutput(os.Stdout)

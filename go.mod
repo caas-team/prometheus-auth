@@ -131,11 +131,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.5.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
-
-replace github.com/codahale/hdrhistogram => github.com/HdrHistogram/hdrhistogram-go v1.0.1
-
-replace go.etcd.io/etcd/v3 => go.etcd.io/etcd/v3 v3.5.10
-
-//replace github.com/prometheus/prometheus v1.8.2-0.20210914090109-37468d88dce8 => github.com/prometheus/prometheus v0.48.0-rc.2
-//
-//replace github.com/cockroachdb/cockroach => github.com/cockroachdb/cockroach v0.0.0-20230922134134-62ad175cbc0e

@@ -109,7 +109,7 @@ func accessControl(ctx context.Context, agt *agent, proxyHandler http.Handler) h
 	router.Path("/api/v1/label/{name}/values").Methods("GET").Handler(proxyHandler)
 	router.Path("/federate").Methods("GET").Handler(apiContextHandler(hijackFederate))
 
-	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	})
 

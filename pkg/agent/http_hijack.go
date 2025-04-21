@@ -35,7 +35,7 @@ func hijackFederate(apiCtx *apiContext) error {
 
 	matchFormValues := queries["match[]"]
 	for _, rawValue := range matchFormValues {
-		_, err := parser.ParseMetricSelector(rawValue)
+		_, err = parser.ParseMetricSelector(rawValue)
 		if err != nil {
 			return errors.Wrap(err, badRequestErr)
 		}
@@ -52,8 +52,8 @@ func hijackFederate(apiCtx *apiContext) error {
 	// hijack
 	queries.Del("match[]")
 	for idx, rawValue := range matchFormValues {
-		expr, err := parser.ParseExpr(rawValue)
-		if err != nil {
+		expr, pErr := parser.ParseExpr(rawValue)
+		if pErr != nil {
 			return errors.Wrap(err, badRequestErr)
 		}
 
@@ -69,7 +69,7 @@ func hijackFederate(apiCtx *apiContext) error {
 	reqURL.RawQuery = queries.Encode()
 
 	// proxy
-	newReq, err := http.NewRequest(http.MethodGet, reqURL.String(), nil)
+	newReq, err := http.NewRequestWithContext(apiCtx.request.Context(), http.MethodGet, reqURL.String(), nil)
 	if err != nil {
 		return errors.Wrap(err, internalErr)
 	}
@@ -140,7 +140,7 @@ func hijackQuery(apiCtx *apiContext) error {
 	reqURL.RawQuery = req.Form.Encode()
 
 	// proxy
-	newReq, err := http.NewRequest(http.MethodGet, reqURL.String(), nil)
+	newReq, err := http.NewRequestWithContext(apiCtx.request.Context(), http.MethodGet, reqURL.String(), nil)
 	if err != nil {
 		return errors.Wrap(err, internalErr)
 	}

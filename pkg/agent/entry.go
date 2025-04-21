@@ -188,7 +188,7 @@ func createAgent(ctx context.Context, cfg *agentConfig) (*agent, error) {
 	}
 
 	// create tokens client and get userInfo
-	tokens := kube.NewTokens(cfg.ctx, k8sClient)
+	tokens := kube.NewTokens(k8sClient)
 	userInfo, err := tokens.Authenticate(ctx, cfg.myToken)
 	if err != nil {
 		return nil, errors.Annotate(err, "unable to get userInfo from agent token")

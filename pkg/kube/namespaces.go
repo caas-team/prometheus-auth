@@ -22,8 +22,12 @@ import (
 )
 
 const (
-	byTokenIndex     = "byToken"
-	byProjectIDIndex = "byProjectID"
+	byTokenIndex               = "byToken"
+	byProjectIDIndex           = "byProjectID"
+	cacheTTL                   = 5 * time.Minute
+	secretInformerResyncPeriod = 2 * time.Hour
+	nsInformerResyncPeriod     = 10 * time.Minute
+	cacheMaxSize               = 1024
 )
 
 type Namespaces interface {
@@ -79,14 +83,14 @@ func (n *namespaces) query(ctx context.Context, token string) (data.Set, error) 
 	}
 
 	for _, nsObj := range nsList {
-		ns := toNamespace(nsObj)
+		ns = toNamespace(nsObj)
 		ret[ns.Name] = struct{}{}
 	}
 	return ret, nil
 }
 
 func (n *namespaces) validate(ctx context.Context, token string) (string, error) {
-	claimNamespace := ""
+	var claimNamespace string
 	// parse token
 	tokenJwt, _ := jwt.Parse(token, nil)
 	claims, _ := tokenJwt.Claims.(jwt.MapClaims)
@@ -94,13 +98,13 @@ func (n *namespaces) validate(ctx context.Context, token string) (string, error)
 	switch claims["iss"] {
 	// bound token
 	case "rke":
-		claimNamespace = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
+		claimNamespace, _ = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
 	// k3s
 	case "https://kubernetes.default.svc.cluster.local":
-		claimNamespace = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
+		claimNamespace, _ = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
 	// legacy token
 	case "kubernetes/serviceaccount":
-		claimNamespace = claims["kubernetes.io/serviceaccount/namespace"].(string)
+		claimNamespace, _ = claims["kubernetes.io/serviceaccount/namespace"].(string)
 	default:
 		return "", errors.New("unknown token claim")
 	}
@@ -136,7 +140,7 @@ func (n *namespaces) validate(ctx context.Context, token string) (string, error)
 	}
 
 	if reviewResult.Status.Allowed {
-		n.reviewResultTTLCache.Add(token, struct{}{}, 5*time.Minute)
+		n.reviewResultTTLCache.Add(token, struct{}{}, cacheTTL)
 		return claimNamespace, nil
 	}
 
@@ -149,26 +153,26 @@ func NewNamespaces(ctx context.Context, k8sClient kubernetes.Interface) Namespac
 	// secrets
 	sec := k8sClient.CoreV1().Secrets(meta.NamespaceAll)
 	secListWatch := &clientCache.ListWatch{
-		ListFunc: func(options meta.ListOptions) (object runtime.Object, e error) {
+		ListFunc: func(options meta.ListOptions) (runtime.Object, error) {
 			return sec.List(ctx, options)
 		},
-		WatchFunc: func(options meta.ListOptions) (i watch.Interface, e error) {
+		WatchFunc: func(options meta.ListOptions) (watch.Interface, error) {
 			return sec.Watch(ctx, options)
 		},
 	}
-	secInformer := clientCache.NewSharedIndexInformer(secListWatch, &core.Secret{}, 2*time.Hour, clientCache.Indexers{byTokenIndex: secretByToken})
+	secInformer := clientCache.NewSharedIndexInformer(secListWatch, &core.Secret{}, secretInformerResyncPeriod, clientCache.Indexers{byTokenIndex: secretByToken})
 
 	// namespaces
 	ns := k8sClient.CoreV1().Namespaces()
 	nsListWatch := &clientCache.ListWatch{
-		ListFunc: func(options meta.ListOptions) (object runtime.Object, e error) {
+		ListFunc: func(options meta.ListOptions) (runtime.Object, error) {
 			return ns.List(ctx, options)
 		},
-		WatchFunc: func(options meta.ListOptions) (i watch.Interface, e error) {
+		WatchFunc: func(options meta.ListOptions) (watch.Interface, error) {
 			return ns.Watch(ctx, options)
 		},
 	}
-	nsInformer := clientCache.NewSharedIndexInformer(nsListWatch, &core.Namespace{}, 10*time.Minute, clientCache.Indexers{byProjectIDIndex: namespaceByProjectID})
+	nsInformer := clientCache.NewSharedIndexInformer(nsListWatch, &core.Namespace{}, nsInformerResyncPeriod, clientCache.Indexers{byProjectIDIndex: namespaceByProjectID})
 
 	// run
 	go secInformer.Run(ctx.Done())
@@ -176,7 +180,7 @@ func NewNamespaces(ctx context.Context, k8sClient kubernetes.Interface) Namespac
 
 	return &namespaces{
 		subjectAccessReviewsClient: k8sClient.AuthorizationV1().SubjectAccessReviews(),
-		reviewResultTTLCache:       cache.NewLRUExpireCache(1024),
+		reviewResultTTLCache:       cache.NewLRUExpireCache(cacheMaxSize),
 		secretIndexer:              secInformer.GetIndexer(),
 		namespaceIndexer:           nsInformer.GetIndexer(),
 	}
