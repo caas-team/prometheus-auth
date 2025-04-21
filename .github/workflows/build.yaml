@@ -57,8 +57,10 @@ jobs:
             ${{ steps.meta.outputs.tags }}
       - name: Sign container images with a key
         uses: dodopizza/cosign-sign-push-action@v1.0.13
+        # only run when a tag is pushed
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          image-tags: ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}, ${{ env.MTR_REPO }}/${{env.IMAGE_NAME}}:${{ env.IMAGE_TAG }}
+          image-tags: ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}, ${{ env.MTR_REPO }}/${{env.IMAGE_NAME}}:${{ github.ref_name }}
           image-digest: ${{ steps.build-and-push.outputs.digest }}
           cosign-private-key: ${{ secrets.COSIGN_KEY }}
           cosign-password: ""
