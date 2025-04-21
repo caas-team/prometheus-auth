@@ -58,7 +58,7 @@ jobs:
         # only run when a tag is pushed
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          image-tags: ${DOCKER_METADATA_OUTPUT_TAGS}
+          image-tags: ${{ env.DOCKER_METADATA_OUTPUT_TAGS }}
           image-digest: ${{ steps.build-and-push.outputs.digest }}
           cosign-private-key: ${{ secrets.COSIGN_KEY }}
           cosign-password: ""
