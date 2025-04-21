@@ -38,7 +38,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}, ${{ env.MTR_REPO }}/${{env.IMAGE_NAME}}:${{ env.IMAGE_TAG }}
+          tags: ghcr.io/${{ github.repository }}/$${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}, ${{ env.MTR_REPO }}/${{env.IMAGE_NAME}}:${{ env.IMAGE_TAG }}
         env:
           IMAGE: prometheus-auth
           MTR: mtr.devops.telekom.de
