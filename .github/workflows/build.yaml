@@ -23,10 +23,9 @@ jobs:
           docker push ghcr.io/${{ github.repository_owner }}/${IMAGE}/${IMAGE}:${VERSION}
           docker tag ghcr.io/${{ github.repository_owner }}/${IMAGE}/${IMAGE}:${VERSION} ${MTR}/${REPO}:${VERSION}
           docker push ${MTR}/${REPO}:${VERSION}
-          cosign sign --key env://COSIGN_KEY --tlog-upload=false ${MTR}/${REPO}:${VERSION}
-          cosign sign --key env://COSIGN_KEY --tlog-upload=false ghcr.io/${{ github.repository_owner }}/${IMAGE}/${IMAGE}:${VERSION}
+          cosign sign --key env://${{ secrets.COSIGN_KEY }} --tlog-upload=false ${MTR}/${REPO}:${VERSION}
+          cosign sign --key env://${{ secrets.COSIGN_KEY }} --tlog-upload=false ghcr.io/${{ github.repository_owner }}/${IMAGE}/${IMAGE}:${VERSION}
         env:
-          COSIGN_KEY: ${{secrets.COSIGN_KEY}}
           IMAGE: prometheus-auth
           MTR: mtr.devops.telekom.de
           REPO: caas/prometheus-auth
