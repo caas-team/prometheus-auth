@@ -13,7 +13,7 @@ import (
 )
 
 type Tokens interface {
-	Authenticate(token string) (authentication.UserInfo, error)
+	Authenticate(ctx context.Context, token string) (authentication.UserInfo, error)
 }
 
 type tokens struct {
@@ -21,7 +21,7 @@ type tokens struct {
 	reviewResultTTLCache *cache.LRUExpireCache
 }
 
-func (t *tokens) Authenticate(token string) (authentication.UserInfo, error) {
+func (t *tokens) Authenticate(ctx context.Context, token string) (authentication.UserInfo, error) {
 	var userInfo authentication.UserInfo
 
 	userInfoInterface, exist := t.reviewResultTTLCache.Get(token)
@@ -30,7 +30,7 @@ func (t *tokens) Authenticate(token string) (authentication.UserInfo, error) {
 		return userInfo, nil
 	}
 
-	tokenReview, err := t.tokenReviewClient.Create(context.TODO(), toTokenReview(token), meta.CreateOptions{})
+	tokenReview, err := t.tokenReviewClient.Create(ctx, toTokenReview(token), meta.CreateOptions{})
 	if err != nil {
 		return userInfo, err
 	}

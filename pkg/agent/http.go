@@ -16,7 +16,7 @@ import (
 	authentication "k8s.io/api/authentication/v1"
 )
 
-func (a *agent) httpBackend() http.Handler {
+func (a *agent) httpBackend(ctx context.Context) http.Handler {
 	proxy := httputil.NewSingleHostReverseProxy(a.cfg.proxyURL)
 	router := mux.NewRouter()
 
@@ -52,12 +52,12 @@ func (a *agent) httpBackend() http.Handler {
 	router.PathPrefix("/debug/").Methods("GET").Handler(proxy)
 
 	// access control
-	router.PathPrefix("/").Handler(accessControl(a, proxy))
+	router.PathPrefix("/").Handler(accessControl(ctx, a, proxy))
 
 	return router
 }
 
-func accessControl(agt *agent, proxyHandler http.Handler) http.Handler {
+func accessControl(ctx context.Context, agt *agent, proxyHandler http.Handler) http.Handler {
 	router := mux.NewRouter()
 
 	router.Use(func(next http.Handler) http.Handler {
@@ -70,7 +70,7 @@ func accessControl(agt *agent, proxyHandler http.Handler) http.Handler {
 			if len(accessToken) == 0 {
 				err = errors.New("no access token provided")
 			} else {
-				userInfo, err = agt.tokens.Authenticate(accessToken)
+				userInfo, err = agt.tokens.Authenticate(ctx, accessToken)
 			}
 
 			if err != nil {
@@ -91,7 +91,7 @@ func accessControl(agt *agent, proxyHandler http.Handler) http.Handler {
 				request:              r,
 				proxyHandler:         proxyHandler,
 				filterReaderLabelSet: agt.cfg.filterReaderLabelSet,
-				namespaceSet:         agt.namespaces.Query(accessToken),
+				namespaceSet:         agt.namespaces.Query(ctx, accessToken),
 				remoteAPI:            agt.remoteAPI,
 			}
 

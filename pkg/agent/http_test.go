@@ -293,7 +293,7 @@ func Test_accessControl(t *testing.T) {
 	startPrometheusWebHandler(t, webHandler)
 
 	agt := mockAgent(t)
-	httpBackend := agt.httpBackend()
+	httpBackend := agt.httpBackend(nil)
 	for _, tc := range getTestCases(t) {
 		tcName := fmt.Sprintf("%s/%s/%s", tc.Type, tc.HTTPMethod, tc.Token)
 		// Run each test case
@@ -622,7 +622,7 @@ type fakeOwnedNamespaces struct {
 	token2Namespaces map[string]data.Set
 }
 
-func (f *fakeOwnedNamespaces) Query(token string) data.Set {
+func (f *fakeOwnedNamespaces) Query(ctx context.Context, token string) data.Set {
 	return f.token2Namespaces[token]
 }
 
@@ -639,7 +639,7 @@ type fakeTokenAuth struct {
 	token2UserInfo map[string]authentication.UserInfo
 }
 
-func (f *fakeTokenAuth) Authenticate(token string) (authentication.UserInfo, error) {
+func (f *fakeTokenAuth) Authenticate(ctx context.Context, token string) (authentication.UserInfo, error) {
 	userInfo, ok := f.token2UserInfo[token]
 	if !ok {
 		return userInfo, errors.New("user is not authenticated")

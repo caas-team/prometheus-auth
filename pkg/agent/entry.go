@@ -68,12 +68,12 @@ func Run(cliContext *cli.Context) {
 
 	log.Println(cfg)
 
-	reader, err := createAgent(context.TODO(), cfg)
+	reader, err := createAgent(ctx, cfg)
 	if err != nil {
 		log.WithError(err).Panic("Failed to create agent")
 	}
 
-	if err = reader.serve(); err != nil {
+	if err = reader.serve(ctx); err != nil {
 		log.WithError(err).Panic("Failed to serve")
 	}
 }
@@ -109,9 +109,9 @@ type agent struct {
 	remoteAPI  promapiv1.API
 }
 
-func (a *agent) serve() error {
+func (a *agent) serve(ctx context.Context) error {
 	listenerMux := cmux.New(a.listener)
-	httpProxy := a.createHTTPProxy()
+	httpProxy := a.createHTTPProxy(nil)
 	grpcProxy := a.createGRPCProxy()
 
 	errCh := make(chan error)
@@ -189,7 +189,7 @@ func createAgent(ctx context.Context, cfg *agentConfig) (*agent, error) {
 
 	// create tokens client and get userInfo
 	tokens := kube.NewTokens(cfg.ctx, k8sClient)
-	userInfo, err := tokens.Authenticate(cfg.myToken)
+	userInfo, err := tokens.Authenticate(ctx, cfg.myToken)
 	if err != nil {
 		return nil, errors.Annotate(err, "unable to get userInfo from agent token")
 	}
@@ -204,9 +204,9 @@ func createAgent(ctx context.Context, cfg *agentConfig) (*agent, error) {
 	}, nil
 }
 
-func (a *agent) createHTTPProxy() *http.Server {
+func (a *agent) createHTTPProxy(ctx context.Context) *http.Server {
 	return &http.Server{
-		Handler:     a.httpBackend(),
+		Handler:     a.httpBackend(ctx),
 		ReadTimeout: a.cfg.readTimeout,
 	}
 }
