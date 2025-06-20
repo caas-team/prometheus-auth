@@ -1,8 +1,6 @@
 module github.com/caas-team/prometheus-auth
 
-go 1.23.0
-
-toolchain go1.23.5
+go 1.24.0
 
 require (
 	github.com/cockroachdb/cmux v0.0.0-20170110192607-30d10be49292
