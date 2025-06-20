@@ -91,10 +91,10 @@ type agentConfig struct {
 func (a *agentConfig) String() string {
 	sb := &strings.Builder{}
 
-	sb.WriteString(fmt.Sprint("listening on ", a.listenAddress))
-	sb.WriteString(fmt.Sprint(", proxying to ", a.proxyURL.String()))
-	sb.WriteString(fmt.Sprintf(" with ignoring 'remote reader' labels [%s]", a.filterReaderLabelSet))
-	sb.WriteString(fmt.Sprintf(", only allow maximum %d connections with %v read timeout", a.maxConnections, a.readTimeout))
+	fmt.Fprint(sb, "listening on ", a.listenAddress)
+	fmt.Fprint(sb, ", proxying to ", a.proxyURL.String())
+	fmt.Fprintf(sb, " with ignoring 'remote reader' labels [%s]", a.filterReaderLabelSet)
+	fmt.Fprintf(sb, ", only allow maximum %d connections with %v read timeout", a.maxConnections, a.readTimeout)
 	sb.WriteString(" .")
 
 	return sb.String()
