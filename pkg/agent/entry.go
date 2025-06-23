@@ -42,7 +42,6 @@ func Run(cliContext *cli.Context) {
 		listenAddress:        cliContext.String("listen-address"),
 		readTimeout:          cliContext.Duration("read-timeout"),
 		maxConnections:       cliContext.Int("max-connections"),
-		oidcIssuer:           cliContext.String("oidc-issuer"),
 		filterReaderLabelSet: data.NewSet(cliContext.StringSlice("filter-reader-labels")...),
 	}
 
@@ -66,6 +65,15 @@ func Run(cliContext *cli.Context) {
 		log.Panicf("Read empty token from file %q", accessTokenPath)
 	}
 	cfg.myToken = accessToken
+
+	oidcURLString := cliContext.String("oidc-issuer")
+	if len(oidcURLString) > 0 {
+		oidcURL, pErr := url.Parse(oidcURLString)
+		if pErr != nil {
+			log.Panicf("Unable to parse OIDC issuer URL %q", oidcURLString)
+		}
+		cfg.oidcIssuer = oidcURL.String()
+	}
 
 	log.Println(cfg)
 

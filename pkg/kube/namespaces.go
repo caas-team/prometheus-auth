@@ -25,6 +25,9 @@ import (
 const (
 	byTokenIndex     = "byToken"
 	byProjectIDIndex = "byProjectID"
+	defaultk3s       = "https://kubernetes.default.svc.cluster.local"
+	defaultRKE       = "rke"
+	defaultLegacy    = "kubernetes/serviceaccount"
 )
 
 type Namespaces interface {
@@ -36,7 +39,12 @@ type namespaces struct {
 	reviewResultTTLCache       *cache.LRUExpireCache
 	secretIndexer              clientCache.Indexer
 	namespaceIndexer           clientCache.Indexer
-	oidcIssuer                 string
+	oidc                       oidc
+}
+
+type oidc struct {
+	active bool
+	issuer string
 }
 
 func (n *namespaces) Query(token string) data.Set {
@@ -99,21 +107,14 @@ func (n *namespaces) validate(token string) (string, error) {
 	}
 
 	// investigate token type
-	switch issuer {
-	// bound token
-	case "rke":
-		claimNamespace = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
-	// k3s
-	case "https://kubernetes.default.svc.cluster.local":
-		claimNamespace = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
-	// legacy token
-	case "kubernetes/serviceaccount":
+	if issuer == defaultk3s || issuer == defaultRKE || (n.oidc.active && issuer == n.oidc.issuer) {
+		claimNamespace, _ = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
+	}
+	if issuer == defaultLegacy {
 		claimNamespace = claims["kubernetes.io/serviceaccount/namespace"].(string)
-	// self-defined OIDC Issuer
-	case n.oidcIssuer:
-		claimNamespace = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
-	default:
-		log.Errorf("invalid claim type found: %v", claims)
+	}
+	if len(claimNamespace) == 0 {
+		log.Errorf("could not parse namespace from claim: %v", claims)
 		return "", errors.New(fmt.Sprintf("unknown token issuer %s", issuer))
 	}
 
@@ -191,7 +192,10 @@ func NewNamespaces(ctx context.Context, k8sClient kubernetes.Interface, oidcIssu
 		reviewResultTTLCache:       cache.NewLRUExpireCache(1024),
 		secretIndexer:              secInformer.GetIndexer(),
 		namespaceIndexer:           nsInformer.GetIndexer(),
-		oidcIssuer:                 oidcIssuer,
+		oidc: oidc{
+			active: len(oidcIssuer) > 0,
+			issuer: oidcIssuer,
+		},
 	}
 }
 
