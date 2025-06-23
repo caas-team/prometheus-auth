@@ -1,8 +1,10 @@
 package kube
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/juju/errors"
@@ -87,11 +89,18 @@ func (n *namespaces) query(token string) (data.Set, error) {
 
 func (n *namespaces) validate(token string) (string, error) {
 	claimNamespace := ""
-	// parse token
+	// Get Issuer - token parsing is skipped here, because we only need the issuer
+	// and we don't have the key to verify the signature.
 	tokenJwt, _ := jwt.Parse(token, nil)
-	claims, _ := tokenJwt.Claims.(jwt.MapClaims)
+	claims, ok := tokenJwt.Claims.(jwt.MapClaims)
+	issuer, gErr := claims.GetIssuer()
+	if cmp.Or(!ok, gErr != nil) {
+		return "", errors.New(fmt.Sprintf("failed to parse claim JWT token: %s", token))
+	}
+
+	clusterName := os.Getenv("CLUSTER_NAME")
 	// investigate token type
-	switch claims["iss"] {
+	switch issuer {
 	// bound token
 	case "rke":
 		claimNamespace = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
@@ -101,8 +110,12 @@ func (n *namespaces) validate(token string) (string, error) {
 	// legacy token
 	case "kubernetes/serviceaccount":
 		claimNamespace = claims["kubernetes.io/serviceaccount/namespace"].(string)
+	// caas OICD
+	case fmt.Sprintf("https://oidc.caas-%s.telekom.de/", clusterName):
+		claimNamespace = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
 	default:
-		return "", errors.New("unknown token claim")
+		log.Errorf("invalid claim type found: %v", claims)
+		return "", errors.New(fmt.Sprintf("unknown token issuer %s", issuer))
 	}
 
 	_, exist := n.reviewResultTTLCache.Get(token)
