@@ -42,6 +42,7 @@ func Run(cliContext *cli.Context) {
 		listenAddress:        cliContext.String("listen-address"),
 		readTimeout:          cliContext.Duration("read-timeout"),
 		maxConnections:       cliContext.Int("max-connections"),
+		oidcIssuer:           cliContext.String("oidc-issuer"),
 		filterReaderLabelSet: data.NewSet(cliContext.StringSlice("filter-reader-labels")...),
 	}
 
@@ -86,6 +87,7 @@ type agentConfig struct {
 	readTimeout          time.Duration
 	maxConnections       int
 	filterReaderLabelSet data.Set
+	oidcIssuer           string
 }
 
 func (a *agentConfig) String() string {
@@ -198,7 +200,7 @@ func createAgent(ctx context.Context, cfg *agentConfig) (*agent, error) {
 		cfg:        cfg,
 		userInfo:   userInfo,
 		listener:   listener,
-		namespaces: kube.NewNamespaces(cfg.ctx, k8sClient),
+		namespaces: kube.NewNamespaces(cfg.ctx, k8sClient, cfg.oidcIssuer),
 		tokens:     tokens,
 		remoteAPI:  promapiv1.NewAPI(promClient),
 	}, nil

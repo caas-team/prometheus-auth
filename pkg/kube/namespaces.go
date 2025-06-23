@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/juju/errors"
@@ -37,6 +36,7 @@ type namespaces struct {
 	reviewResultTTLCache       *cache.LRUExpireCache
 	secretIndexer              clientCache.Indexer
 	namespaceIndexer           clientCache.Indexer
+	oidcIssuer                 string
 }
 
 func (n *namespaces) Query(token string) data.Set {
@@ -98,7 +98,6 @@ func (n *namespaces) validate(token string) (string, error) {
 		return "", errors.New(fmt.Sprintf("failed to parse claim JWT token: %s", token))
 	}
 
-	clusterName := os.Getenv("CLUSTER_NAME")
 	// investigate token type
 	switch issuer {
 	// bound token
@@ -110,8 +109,8 @@ func (n *namespaces) validate(token string) (string, error) {
 	// legacy token
 	case "kubernetes/serviceaccount":
 		claimNamespace = claims["kubernetes.io/serviceaccount/namespace"].(string)
-	// caas OICD
-	case fmt.Sprintf("https://oidc.caas-%s.telekom.de/", clusterName):
+	// self-defined OIDC Issuer
+	case n.oidcIssuer:
 		claimNamespace = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
 	default:
 		log.Errorf("invalid claim type found: %v", claims)
@@ -158,7 +157,7 @@ func (n *namespaces) validate(token string) (string, error) {
 	return claimNamespace, nil
 }
 
-func NewNamespaces(ctx context.Context, k8sClient kubernetes.Interface) Namespaces {
+func NewNamespaces(ctx context.Context, k8sClient kubernetes.Interface, oidcIssuer string) Namespaces {
 	// secrets
 	sec := k8sClient.CoreV1().Secrets(meta.NamespaceAll)
 	secListWatch := &clientCache.ListWatch{
@@ -192,6 +191,7 @@ func NewNamespaces(ctx context.Context, k8sClient kubernetes.Interface) Namespac
 		reviewResultTTLCache:       cache.NewLRUExpireCache(1024),
 		secretIndexer:              secInformer.GetIndexer(),
 		namespaceIndexer:           nsInformer.GetIndexer(),
+		oidcIssuer:                 oidcIssuer,
 	}
 }
 
