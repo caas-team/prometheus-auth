@@ -46,6 +46,7 @@ GLOBAL OPTIONS:
    --listen-address value        [optional] Address to listening (default: ":9090")
    --proxy-url value             [optional] URL to proxy (default: "http://localhost:9999")
    --read-timeout value          [optional] Maximum duration before timing out read of the request, and closing idle connections (default: 5m0s)
+   --oidc-issuer value           [optional] OIDC issuer URL (default: "https://rancher.example.com")
    --max-connections value       [optional] Maximum number of simultaneous connections (default: 512)
    --filter-reader-labels value  [optional] Filter out the configured labels when calling '/api/v1/read'
    --help, -h                    show help

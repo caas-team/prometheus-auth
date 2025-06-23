@@ -66,6 +66,15 @@ func Run(cliContext *cli.Context) {
 	}
 	cfg.myToken = accessToken
 
+	oidcURLString := cliContext.String("oidc-issuer")
+	if len(oidcURLString) > 0 {
+		oidcURL, pErr := url.Parse(oidcURLString)
+		if pErr != nil {
+			log.Panicf("Unable to parse OIDC issuer URL %q", oidcURLString)
+		}
+		cfg.oidcIssuer = oidcURL.String()
+	}
+
 	log.Println(cfg)
 
 	reader, err := createAgent(context.TODO(), cfg)
@@ -86,6 +95,7 @@ type agentConfig struct {
 	readTimeout          time.Duration
 	maxConnections       int
 	filterReaderLabelSet data.Set
+	oidcIssuer           string
 }
 
 func (a *agentConfig) String() string {
@@ -198,7 +208,7 @@ func createAgent(ctx context.Context, cfg *agentConfig) (*agent, error) {
 		cfg:        cfg,
 		userInfo:   userInfo,
 		listener:   listener,
-		namespaces: kube.NewNamespaces(cfg.ctx, k8sClient),
+		namespaces: kube.NewNamespaces(cfg.ctx, k8sClient, cfg.oidcIssuer),
 		tokens:     tokens,
 		remoteAPI:  promapiv1.NewAPI(promClient),
 	}, nil
