@@ -5,7 +5,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/juju/errors"
 
@@ -24,8 +27,13 @@ import (
 )
 
 const (
-	byTokenIndex     = "byToken"
-	byProjectIDIndex = "byProjectID"
+	byTokenIndex       = "byToken"
+	byProjectIDIndex   = "byProjectID"
+	cacheTTL           = 5 * time.Minute
+	secretResyncPeriod = 2 * time.Hour
+	nsResyncPeriod     = 10 * time.Minute
+		 reviewResultCacheSizeBytes = 1024
+
 )
 
 type Namespaces interface {
@@ -37,8 +45,62 @@ type namespaces struct {
 	reviewResultTTLCache       *cache.LRUExpireCache
 	secretIndexer              clientCache.Indexer
 	namespaceIndexer           clientCache.Indexer
+	metrics                    *metrics
 }
 
+type metrics struct {
+	successfulValidations *prometheus.CounterVec
+	failedValdations      *prometheus.CounterVec
+	mu                    sync.Mutex
+}
+
+// NewMetrics creates a new metrics struct with initialized prometheus metrics.
+func NewMetrics(reg prometheus.Registerer) *metrics {
+	res := metrics{
+		successfulValidations: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "prometheus_auth_successful_validations_total",
+				Help: "Total number of successful service account validations.",
+			},
+			[]string{"namespace"},
+		),
+		failedValdations: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "prometheus_auth_failed_validations_total",
+				Help: "Total number of failed service account validations. If no label is set, the namespace couldn't be parsed.",
+			},
+			[]string{"namespace"},
+		),
+		mu: sync.Mutex{},
+	}
+
+	reg.MustRegister(res.GetCollectors()...)
+	return &res
+}
+
+// IncSuccessfulRequests increments the successful requests counter for the given namespace.
+func (m *metrics) IncSuccessfulRequests(namespace string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.successfulValidations.WithLabelValues(namespace).Inc()
+}
+
+// IncFailedRequests increments the failed requests counter for the given namespace.
+func (m *metrics) IncFailedRequests(namespace string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.failedValdations.WithLabelValues(namespace).Inc()
+}
+
+// GetCollectors returns all metric collectors.
+func (m *metrics) GetCollectors() []prometheus.Collector {
+	return []prometheus.Collector{
+		m.successfulValidations,
+		m.failedValdations,
+	}
+}
+
+// Query returns the namespaces associated with the given token.
 func (n *namespaces) Query(token string) data.Set {
 	ret, err := n.query(token)
 	if err != nil {
@@ -47,6 +109,8 @@ func (n *namespaces) Query(token string) data.Set {
 	return ret
 }
 
+// query retrieves the namespaces associated with the given token,
+// which match the project ID of the namespace the token belongs to.
 func (n *namespaces) query(token string) (data.Set, error) {
 	ret := data.Set{}
 
@@ -81,21 +145,23 @@ func (n *namespaces) query(token string) (data.Set, error) {
 	}
 
 	for _, nsObj := range nsList {
-		ns := toNamespace(nsObj)
+		ns = toNamespace(nsObj)
 		ret[ns.Name] = struct{}{}
 	}
 	return ret, nil
 }
 
+// validate checks the token and returns the namespace it is associated with,
+// or an error if the token is invalid or does not have access to the namespace.
 func (n *namespaces) validate(token string) (string, error) {
-	claimNamespace := ""
+	var claimNamespace string
 	// Get Issuer - token parsing is skipped here, because we only need the issuer
 	// and we don't have the key to verify the signature.
 	tokenJwt, _ := jwt.Parse(token, nil)
 	claims, ok := tokenJwt.Claims.(jwt.MapClaims)
 	issuer, gErr := claims.GetIssuer()
 	if cmp.Or(!ok, gErr != nil) {
-		return "", errors.New(fmt.Sprintf("failed to parse claim JWT token: %s", token))
+		return "", fmt.Errorf("failed to parse claim JWT token: %s", token)
 	}
 
 	clusterName := os.Getenv("CLUSTER_NAME")
@@ -103,24 +169,26 @@ func (n *namespaces) validate(token string) (string, error) {
 	switch issuer {
 	// bound token
 	case "rke":
-		claimNamespace = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
+		claimNamespace, _ = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
 	// k3s
 	case "https://kubernetes.default.svc.cluster.local":
-		claimNamespace = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
+		claimNamespace, _ = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
 	// legacy token
 	case "kubernetes/serviceaccount":
-		claimNamespace = claims["kubernetes.io/serviceaccount/namespace"].(string)
+		claimNamespace, _ = claims["kubernetes.io/serviceaccount/namespace"].(string)
 	// caas OICD
 	case fmt.Sprintf("https://oidc.caas-%s.telekom.de/", clusterName):
-		claimNamespace = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
+		claimNamespace, _ = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
 	default:
 		log.Errorf("invalid claim type found: %v", claims)
-		return "", errors.New(fmt.Sprintf("unknown token issuer %s", issuer))
+		n.metrics.IncFailedRequests("")
+		return "", fmt.Errorf("unknown token issuer %s", issuer)
 	}
 
 	_, exist := n.reviewResultTTLCache.Get(token)
 	if exist {
 		log.Debugf("token for ns %q is cached", claimNamespace)
+		n.metrics.IncSuccessfulRequests(claimNamespace)
 		return claimNamespace, nil
 	}
 
@@ -141,47 +209,51 @@ func (n *namespaces) validate(token string) (string, error) {
 	log.Debugf("sending access review for namespace %q", claimNamespace)
 	reviewResult, err := n.subjectAccessReviewsClient.Create(context.TODO(), sar, meta.CreateOptions{})
 	if err != nil {
+		n.metrics.IncFailedRequests(claimNamespace)
 		return "", errors.Annotatef(err, "failed to review token")
 	}
 
 	if !reviewResult.Status.Allowed || reviewResult.Status.Denied {
+		n.metrics.IncFailedRequests(claimNamespace)
 		return "", fmt.Errorf("token is not allowed to access namespace %q", claimNamespace)
 	}
 
 	if reviewResult.Status.Allowed {
-		n.reviewResultTTLCache.Add(token, struct{}{}, 5*time.Minute)
+		n.reviewResultTTLCache.Add(token, struct{}{}, cacheTTL)
+		log.Debugf("token is allowed to access namespace %q, accepted", claimNamespace)
+		n.metrics.IncSuccessfulRequests(claimNamespace)
 		return claimNamespace, nil
 	}
 
 	log.Debugf("token is not allowed to access namespace %q, denied: %s", claimNamespace, reviewResult.Status.Reason)
-
+	n.metrics.IncFailedRequests(claimNamespace)
 	return claimNamespace, nil
 }
 
-func NewNamespaces(ctx context.Context, k8sClient kubernetes.Interface) Namespaces {
+func NewNamespaces(ctx context.Context, k8sClient kubernetes.Interface, reg *prometheus.Registry) Namespaces {
 	// secrets
 	sec := k8sClient.CoreV1().Secrets(meta.NamespaceAll)
 	secListWatch := &clientCache.ListWatch{
-		ListFunc: func(options meta.ListOptions) (object runtime.Object, e error) {
-			return sec.List(context.TODO(), options)
+		ListWithContextFunc: func(ctx context.Context, options meta.ListOptions) (runtime.Object, error) {
+			return sec.List(ctx, options)
 		},
-		WatchFunc: func(options meta.ListOptions) (i watch.Interface, e error) {
-			return sec.Watch(context.TODO(), options)
+		WatchFuncWithContext: func(ctx context.Context, options meta.ListOptions) (watch.Interface, error) {
+			return sec.Watch(ctx, options)
 		},
 	}
-	secInformer := clientCache.NewSharedIndexInformer(secListWatch, &core.Secret{}, 2*time.Hour, clientCache.Indexers{byTokenIndex: secretByToken})
+	secInformer := clientCache.NewSharedIndexInformer(secListWatch, &core.Secret{}, secretResyncPeriod, clientCache.Indexers{byTokenIndex: secretByToken})
 
 	// namespaces
 	ns := k8sClient.CoreV1().Namespaces()
 	nsListWatch := &clientCache.ListWatch{
-		ListFunc: func(options meta.ListOptions) (object runtime.Object, e error) {
-			return ns.List(context.TODO(), options)
+		ListWithContextFunc: func(ctx context.Context, options meta.ListOptions) (runtime.Object, error) {
+			return ns.List(ctx, options)
 		},
-		WatchFunc: func(options meta.ListOptions) (i watch.Interface, e error) {
-			return ns.Watch(context.TODO(), options)
+		WatchFuncWithContext: func(ctx context.Context, options meta.ListOptions) (watch.Interface, error) {
+			return ns.Watch(ctx, options)
 		},
 	}
-	nsInformer := clientCache.NewSharedIndexInformer(nsListWatch, &core.Namespace{}, 10*time.Minute, clientCache.Indexers{byProjectIDIndex: namespaceByProjectID})
+	nsInformer := clientCache.NewSharedIndexInformer(nsListWatch, &core.Namespace{}, nsResyncPeriod, clientCache.Indexers{byProjectIDIndex: namespaceByProjectID})
 
 	// run
 	go secInformer.Run(ctx.Done())
@@ -189,9 +261,10 @@ func NewNamespaces(ctx context.Context, k8sClient kubernetes.Interface) Namespac
 
 	return &namespaces{
 		subjectAccessReviewsClient: k8sClient.AuthorizationV1().SubjectAccessReviews(),
-		reviewResultTTLCache:       cache.NewLRUExpireCache(1024),
+		reviewResultTTLCache:       cache.NewLRUExpireCache(reviewResultCacheSizeBytes),
 		secretIndexer:              secInformer.GetIndexer(),
 		namespaceIndexer:           nsInformer.GetIndexer(),
+		metrics:                    NewMetrics(reg),
 	}
 }
 

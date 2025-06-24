@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	_ "net/http/pprof" //nolint: gosec // enable profiler
+	_ "net/http/pprof"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 
 	"github.com/caas-team/prometheus-auth/pkg/data"
 	"github.com/caas-team/prometheus-auth/pkg/kube"
@@ -107,6 +110,7 @@ type agent struct {
 	namespaces kube.Namespaces
 	tokens     kube.Tokens
 	remoteAPI  promapiv1.API
+	registry   *prometheus.Registry
 }
 
 func (a *agent) serve() error {
@@ -163,6 +167,13 @@ func createAgent(ctx context.Context, cfg *agentConfig) (*agent, error) {
 		},
 	}
 
+	// register standard prometheus metrics
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(
+		collectors.NewGoCollector(nil),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+	)
+
 	listener, err := net.Listen("tcp", cfg.listenAddress)
 	if err != nil {
 		return nil, errors.Annotatef(err, "unable to listen on addr %s", cfg.listenAddress)
@@ -198,9 +209,10 @@ func createAgent(ctx context.Context, cfg *agentConfig) (*agent, error) {
 		cfg:        cfg,
 		userInfo:   userInfo,
 		listener:   listener,
-		namespaces: kube.NewNamespaces(cfg.ctx, k8sClient),
+		namespaces: kube.NewNamespaces(cfg.ctx, k8sClient, registry),
 		tokens:     tokens,
 		remoteAPI:  promapiv1.NewAPI(promClient),
+		registry:   registry,
 	}, nil
 }
 

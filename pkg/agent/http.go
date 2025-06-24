@@ -31,7 +31,12 @@ func (a *agent) httpBackend() http.Handler {
 	}
 
 	// enable metrics
-	router.Path("/_/metrics").Methods("GET").Handler(promhttp.Handler())
+	router.Path("/_/metrics").Methods("GET").Handler(promhttp.HandlerFor(
+		a.registry,
+		promhttp.HandlerOpts{
+			Registry: a.registry,
+		},
+	))
 
 	// proxy white list
 	router.Path("/alerts").Methods("GET").Handler(proxy)
