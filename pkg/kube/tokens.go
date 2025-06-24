@@ -3,7 +3,6 @@ package kube
 import (
 	"context"
 	"fmt"
-	"time"
 
 	authentication "k8s.io/api/authentication/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,7 +25,7 @@ func (t *tokens) Authenticate(token string) (authentication.UserInfo, error) {
 
 	userInfoInterface, exist := t.reviewResultTTLCache.Get(token)
 	if exist {
-		userInfo = userInfoInterface.(authentication.UserInfo)
+		userInfo, _ = userInfoInterface.(authentication.UserInfo)
 		return userInfo, nil
 	}
 
@@ -38,7 +37,7 @@ func (t *tokens) Authenticate(token string) (authentication.UserInfo, error) {
 	if !tokenReview.Status.Authenticated {
 		return userInfo, fmt.Errorf("user is not authenticated: %s", tokenReview.Status.Error)
 	}
-	t.reviewResultTTLCache.Add(token, userInfo, 5*time.Minute)
+	t.reviewResultTTLCache.Add(token, userInfo, cacheTTL)
 	return userInfo, nil
 }
 
@@ -53,7 +52,7 @@ func toTokenReview(token string) *authentication.TokenReview {
 func NewTokens(_ context.Context, k8sClient kubernetes.Interface) Tokens {
 	return &tokens{
 		tokenReviewClient:    k8sClient.AuthenticationV1().TokenReviews(),
-		reviewResultTTLCache: cache.NewLRUExpireCache(1024),
+		reviewResultTTLCache: cache.NewLRUExpireCache(reviewResultCacheSizeBytes),
 	}
 }
 

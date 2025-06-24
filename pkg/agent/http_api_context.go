@@ -22,9 +22,9 @@ type apiContextKeyT string
 const apiContextKey apiContextKeyT = "_apiContextKey_"
 
 var (
-	badRequestErr     = errors.BadRequestf("bad_data")
-	notProvisionedErr = errors.NotProvisionedf("execution")
-	internalErr       = errors.New("internal")
+	errBadRequest     = errors.BadRequestf("bad_data")
+	errNotProvisioned = errors.NotProvisionedf("execution")
+	errInternal       = errors.New("internal")
 )
 
 type apiContext struct {
@@ -45,7 +45,8 @@ type jsonResponseData struct {
 	Error     string      `json:"error,omitempty"`
 }
 
-func (c *apiContext) responseJSON(data interface{}) (err error) {
+func (c *apiContext) responseJSON(data interface{}) error {
+	var err error
 	c.Do(func() {
 		resp := c.response
 		resp.Header().Set("Content-Type", "application/json")
@@ -57,19 +58,21 @@ func (c *apiContext) responseJSON(data interface{}) (err error) {
 
 		respBytes, marshalErr := json.Marshal(responseData)
 		if marshalErr != nil {
-			err = errors.Wrap(marshalErr, internalErr)
+			err = errors.Wrap(marshalErr, errInternal)
 			return
 		}
 
 		if _, writeErr := resp.Write(respBytes); writeErr != nil {
-			err = errors.Wrap(writeErr, internalErr)
+			err = errors.Wrap(writeErr, errInternal)
+			return
 		}
 	})
 
 	return err
 }
 
-func (c *apiContext) responseProto(data proto.Message) (err error) {
+func (c *apiContext) responseProto(data proto.Message) error {
+	var err error
 	c.Do(func() {
 		resp := c.response
 		resp.Header().Set("Content-Type", "application/x-protobuf")
@@ -82,20 +85,22 @@ func (c *apiContext) responseProto(data proto.Message) (err error) {
 
 		responseData, marshalErr := proto.Marshal(data)
 		if marshalErr != nil {
-			err = errors.Wrap(marshalErr, internalErr)
+			err = errors.Wrap(marshalErr, errInternal)
 			return
 		}
 
 		respBytes := snappy.Encode(nil, responseData)
 		if _, writeErr := resp.Write(respBytes); writeErr != nil {
-			err = errors.Wrap(writeErr, internalErr)
+			err = errors.Wrap(writeErr, errInternal)
+			return
 		}
 	})
 
 	return err
 }
 
-func (c *apiContext) responseMetrics(data *promgo.MetricFamily) (err error) {
+func (c *apiContext) responseMetrics(data *promgo.MetricFamily) error {
+	var err error
 	c.Do(func() {
 		req, resp := c.request, c.response
 
@@ -108,7 +113,7 @@ func (c *apiContext) responseMetrics(data *promgo.MetricFamily) (err error) {
 		}
 
 		if encodeErr := respEncoder.Encode(data); encodeErr != nil {
-			err = errors.Wrap(encodeErr, internalErr)
+			err = errors.Wrap(encodeErr, errInternal)
 		}
 	})
 
@@ -130,7 +135,7 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown internal error", http.StatusInternalServerError)
 	})
 
-	apiCtx := r.Context().Value(apiContextKey).(*apiContext)
+	apiCtx, _ := r.Context().Value(apiContextKey).(*apiContext)
 
 	err := f(apiCtx)
 	if err == nil {
@@ -140,7 +145,7 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Debug(errors.ErrorStack(err))
 
 	// response error msg
-	causeErrMsg := ""
+	var causeErrMsg string
 	var e *errors.Err
 	switch {
 	case errors.As(err, &e):
@@ -151,10 +156,10 @@ func (f apiContextHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	responseErrType := ""
 	responseCode := http.StatusInternalServerError
-	if errors.As(err, &badRequestErr) {
+	if errors.As(err, &errBadRequest) {
 		responseCode = http.StatusBadRequest
 		responseErrType = "bad_data"
-	} else if errors.As(err, &notProvisionedErr) {
+	} else if errors.As(err, &errNotProvisioned) {
 		responseCode = http.StatusUnprocessableEntity
 		responseErrType = "execution"
 	}

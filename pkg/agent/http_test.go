@@ -17,6 +17,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/juju/errors"
 	"github.com/prometheus/prometheus/promql/promqltest"
 
@@ -395,6 +397,8 @@ func mockAgent(t *testing.T) *agent {
 		t.Error(err)
 	}
 
+	registry := prometheus.NewRegistry()
+
 	return &agent{
 		cfg: agtCfg,
 		userInfo: authentication.UserInfo{
@@ -404,6 +408,7 @@ func mockAgent(t *testing.T) *agent {
 		namespaces: mockOwnedNamespaces(),
 		tokens:     mockTokenAuth(),
 		remoteAPI:  promapiv1.NewAPI(promClient),
+		registry:   registry,
 	}
 }
 

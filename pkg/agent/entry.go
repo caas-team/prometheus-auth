@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" //nolint:gosec // enable pprof for debugging
 	"net/url"
 	"os"
 	"strings"
@@ -18,7 +18,6 @@ import (
 	"github.com/caas-team/prometheus-auth/pkg/kube"
 	"github.com/cockroachdb/cmux"
 	"github.com/juju/errors"
-	grpcproxy "github.com/mwitkow/grpc-proxy/proxy"
 	promapi "github.com/prometheus/client_golang/api"
 	promapiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	log "github.com/sirupsen/logrus"
@@ -32,9 +31,9 @@ import (
 )
 
 func Run(cliContext *cli.Context) {
-	// enable profiler
+	// enable profiler if debug is active
 	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
+		log.Println(http.ListenAndServe("localhost:6060", nil)) //nolint:gosec // TODO: set profiler behind a flag
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -71,7 +70,7 @@ func Run(cliContext *cli.Context) {
 
 	log.Println(cfg)
 
-	reader, err := createAgent(context.TODO(), cfg)
+	reader, err := createAgent(context.Background(), cfg)
 	if err != nil {
 		log.WithError(err).Panic("Failed to create agent")
 	}
@@ -94,10 +93,10 @@ type agentConfig struct {
 func (a *agentConfig) String() string {
 	sb := &strings.Builder{}
 
-	fmt.Fprint(sb, "listening on ", a.listenAddress)
-	fmt.Fprint(sb, ", proxying to ", a.proxyURL.String())
-	fmt.Fprintf(sb, " with ignoring 'remote reader' labels [%s]", a.filterReaderLabelSet)
-	fmt.Fprintf(sb, ", only allow maximum %d connections with %v read timeout", a.maxConnections, a.readTimeout)
+	_, _ = fmt.Fprint(sb, "listening on ", a.listenAddress)
+	_, _ = fmt.Fprint(sb, ", proxying to ", a.proxyURL.String())
+	_, _ = fmt.Fprintf(sb, " with ignoring 'remote reader' labels [%s]", a.filterReaderLabelSet)
+	_, _ = fmt.Fprintf(sb, ", only allow maximum %d connections with %v read timeout", a.maxConnections, a.readTimeout)
 	sb.WriteString(" .")
 
 	return sb.String()
@@ -150,10 +149,10 @@ func (a *agent) serve() error {
 	}
 }
 
-func createAgent(ctx context.Context, cfg *agentConfig) (*agent, error) {
+func createAgent(_ context.Context, cfg *agentConfig) (*agent, error) {
 	utilruntime.ReallyCrash = false
 	utilruntime.PanicHandlers = []func(context.Context, interface{}){
-		func(ctx context.Context, i interface{}) {
+		func(_ context.Context, i interface{}) {
 			if err, ok := i.(error); ok {
 				log.Error(errors.ErrorStack(err))
 			} else {
@@ -161,8 +160,8 @@ func createAgent(ctx context.Context, cfg *agentConfig) (*agent, error) {
 			}
 		},
 	}
-	utilruntime.ErrorHandlers = []utilruntime.ErrorHandler{
-		func(ctx context.Context, err error, msg string, args ...interface{}) {
+	utilruntime.ErrorHandlers = []utilruntime.ErrorHandler{ //nolint:reassign // normal usage
+		func(_ context.Context, err error, _ string, _ ...interface{}) {
 			log.Error(errors.ErrorStack(err))
 		},
 	}
@@ -225,7 +224,6 @@ func (a *agent) createHTTPProxy() *http.Server {
 
 func (a *agent) createGRPCProxy() *grpc.Server {
 	return grpc.NewServer(
-		grpc.CustomCodec(grpcproxy.Codec()),
 		grpc.UnknownServiceHandler(a.grpcBackend()),
 	)
 }

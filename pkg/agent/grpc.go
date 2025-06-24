@@ -10,12 +10,11 @@ import (
 )
 
 func (a *agent) grpcBackend() grpc.StreamHandler {
-	return grpcproxy.TransparentHandler(func(ctx context.Context, fullMethodName string) (context.Context, *grpc.ClientConn, error) {
-		con, err := grpc.DialContext(ctx, a.cfg.proxyURL.String(), grpc.WithDefaultCallOptions(grpc.CallCustomCodec(grpcproxy.Codec())))
+	return grpcproxy.TransparentHandler(func(ctx context.Context, _ string) (context.Context, *grpc.ClientConn, error) {
+		con, err := grpc.NewClient(a.cfg.proxyURL.String())
 		if err != nil {
 			return ctx, nil, status.Errorf(codes.Unavailable, "Unavailable endpoint")
 		}
-
 		return ctx, con, nil
 	})
 }

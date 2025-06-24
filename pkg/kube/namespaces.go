@@ -27,13 +27,12 @@ import (
 )
 
 const (
-	byTokenIndex       = "byToken"
-	byProjectIDIndex   = "byProjectID"
-	cacheTTL           = 5 * time.Minute
-	secretResyncPeriod = 2 * time.Hour
-	nsResyncPeriod     = 10 * time.Minute
-		 reviewResultCacheSizeBytes = 1024
-
+	byTokenIndex               = "byToken"
+	byProjectIDIndex           = "byProjectID"
+	cacheTTL                   = 5 * time.Minute
+	secretResyncPeriod         = 2 * time.Hour
+	nsResyncPeriod             = 10 * time.Minute
+	reviewResultCacheSizeBytes = 1024
 )
 
 type Namespaces interface {

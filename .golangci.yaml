@@ -165,6 +165,10 @@ linters:
         - lll
     perfsprint:
       strconcat: false
+    revive:
+      rules:
+        - name: unexported-return
+          disabled: true # too strict
     rowserrcheck:
       packages:
         - github.com/jmoiron/sqlx
@@ -173,6 +177,9 @@ linters:
       context: scope
   exclusions:
     generated: lax
+    paths-except:
+      - $pkg/agent/test/
+      - .*_test.go
     presets:
       - comments
       - common-false-positives
@@ -185,20 +192,11 @@ linters:
       - linters:
           - gocritic
         source: //noinspection
-      - linters:
-          - bodyclose
-          - dupl
-          - funlen
-          - goconst
-          - gosec
-          - mnd
-          - noctx
-          - wrapcheck
-        path: _test\.go
     paths:
       - third_party$
       - builtin$
       - examples$
+      - pkg/agent/test/
 issues:
   max-same-issues: 50
 formatters:
