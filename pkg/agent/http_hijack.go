@@ -63,8 +63,10 @@ func hijackFederate(apiCtx *apiContext) error {
 		log.Debugf("raw federate[%s - %d] => %s", apiCtx.tag, idx, rawValue)
 		hjkValue := modifyExpression(expr, apiCtx.namespaceSet)
 		log.Debugf("hjk federate[%s - %d] => %s", apiCtx.tag, idx, hjkValue)
-
 		queries.Add("match[]", hjkValue)
+		// Add exported_namespace label to the query, to get all metrics with the exported_namespace as well
+		cloned := cloneAndReplaceLabel(expr, "namespace", "exported_namespace")
+		queries.Add("match[]", cloned.String())
 	}
 
 	// inject
@@ -78,6 +80,35 @@ func hijackFederate(apiCtx *apiContext) error {
 	}
 
 	return apiCtx.proxyWith(newReq)
+}
+
+// cloneAndReplaceLabel clones the given expression and replaces the label
+// `from` with `to` in the cloned expression's label matchers.
+func cloneAndReplaceLabel(expr parser.Expr, from, to string) parser.Expr { //nolint:gocognit // function is not too complex
+	cloned, err := parser.ParseExpr(expr.String())
+	if err == nil {
+		parser.Inspect(cloned, func(node parser.Node, _ []parser.Node) error {
+			switch n := node.(type) {
+			case *parser.VectorSelector:
+				for _, m := range n.LabelMatchers {
+					if m.Name == from {
+						m.Name = to
+					}
+				}
+			case *parser.MatrixSelector:
+				if vs, ok := n.VectorSelector.(*parser.VectorSelector); ok {
+					for _, m := range vs.LabelMatchers {
+						if m.Name == from {
+							m.Name = to
+						}
+					}
+				}
+			}
+			return nil
+		})
+	}
+
+	return cloned
 }
 
 func hijackQuery(apiCtx *apiContext) error {

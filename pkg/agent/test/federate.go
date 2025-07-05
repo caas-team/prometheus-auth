@@ -218,6 +218,8 @@ test_metric1{foo="bar",namespace="ns-a",instance="",prometheus="cluster-level/te
 test_cluster_wide_metric{namespace="caasglobal",instance="",prometheus="cluster-level/test"} 1 6000000
 # TYPE test_metric1 untyped
 test_metric1{foo="bar",namespace="ns-a",instance="",prometheus="cluster-level/test"} 10000 6000000
+# TYPE test_metric3_exported_ns untyped
+test_metric3_exported_ns{exported_namespace="ns-a",namespace="some-central-operator",instance="",prometheus="cluster-level/test"} 1 6000000
 `,
 	},
 	"empty existing label value matches everything that doesn't have that label": {
@@ -227,6 +229,8 @@ test_metric1{foo="bar",namespace="ns-a",instance="",prometheus="cluster-level/te
 		RespCode: http.StatusOK,
 		RespBody: `# TYPE test_cluster_wide_metric untyped
 test_cluster_wide_metric{namespace="caasglobal",instance="",prometheus="cluster-level/test"} 1 6000000
+# TYPE test_metric3_exported_ns untyped
+test_metric3_exported_ns{exported_namespace="ns-a",namespace="some-central-operator",instance="",prometheus="cluster-level/test"} 1 6000000
 `,
 	},
 	"empty none-existing label value matches everything": {
@@ -238,6 +242,8 @@ test_cluster_wide_metric{namespace="caasglobal",instance="",prometheus="cluster-
 test_cluster_wide_metric{namespace="caasglobal",instance="",prometheus="cluster-level/test"} 1 6000000
 # TYPE test_metric1 untyped
 test_metric1{foo="bar",namespace="ns-a",instance="",prometheus="cluster-level/test"} 10000 6000000
+# TYPE test_metric3_exported_ns untyped
+test_metric3_exported_ns{exported_namespace="ns-a",namespace="some-central-operator",instance="",prometheus="cluster-level/test"} 1 6000000
 `,
 	},
 	"empty `namespace` label value matches everything that doesn't have `namespace` label": {
@@ -366,6 +372,8 @@ test_metric1{foo="bar",namespace="ns-a",instance="",prometheus="cluster-level/te
 test_metric1{foo="boo",namespace="ns-c",instance="",prometheus="cluster-level/test"} 1 6000000
 # TYPE test_metric2 untyped
 test_metric2{foo="boo",instance="",prometheus="cluster-level/test"} 1 6000000
+# TYPE test_metric3_exported_ns untyped
+test_metric3_exported_ns{exported_namespace="ns-a",namespace="some-central-operator",instance="",prometheus="cluster-level/test"} 1 6000000
 # TYPE test_metric_old untyped
 test_metric_old{instance="",prometheus="cluster-level/test"} 981 5880000
 # TYPE test_metric_without_labels untyped
@@ -379,6 +387,8 @@ test_metric_without_labels{instance="",prometheus="cluster-level/test"} 1001 600
 		RespCode: http.StatusOK,
 		RespBody: `# TYPE test_cluster_wide_metric untyped
 test_cluster_wide_metric{namespace="caasglobal",instance="",prometheus="cluster-level/test"} 1 6000000
+# TYPE test_metric3_exported_ns untyped
+test_metric3_exported_ns{exported_namespace="ns-a",namespace="some-central-operator",instance="",prometheus="cluster-level/test"} 1 6000000
 # TYPE test_metric_old untyped
 test_metric_old{instance="",prometheus="cluster-level/test"} 981 5880000
 # TYPE test_metric_without_labels untyped
@@ -397,6 +407,8 @@ test_metric1{foo="bar",namespace="ns-a",instance="",prometheus="cluster-level/te
 test_metric1{foo="boo",namespace="ns-c",instance="",prometheus="cluster-level/test"} 1 6000000
 # TYPE test_metric2 untyped
 test_metric2{foo="boo",instance="",prometheus="cluster-level/test"} 1 6000000
+# TYPE test_metric3_exported_ns untyped
+test_metric3_exported_ns{exported_namespace="ns-a",namespace="some-central-operator",instance="",prometheus="cluster-level/test"} 1 6000000
 # TYPE test_metric_old untyped
 test_metric_old{instance="",prometheus="cluster-level/test"} 981 5880000
 # TYPE test_metric_without_labels untyped
