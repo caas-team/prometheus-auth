@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -29,6 +28,9 @@ import (
 const (
 	byTokenIndex               = "byToken"
 	byProjectIDIndex           = "byProjectID"
+	defaultk3s                 = "https://kubernetes.default.svc.cluster.local"
+	defaultRKE                 = "rke"
+	defaultLegacy              = "kubernetes/serviceaccount"
 	cacheTTL                   = 5 * time.Minute
 	secretResyncPeriod         = 2 * time.Hour
 	nsResyncPeriod             = 10 * time.Minute
@@ -45,8 +47,13 @@ type namespaces struct {
 	secretIndexer              clientCache.Indexer
 	namespaceIndexer           clientCache.Indexer
 	metrics                    *metrics
+	oidc                       oidc
 }
 
+type oidc struct {
+	active bool
+	issuer string
+}
 type metrics struct {
 	successfulValidations *prometheus.CounterVec
 	failedValdations      *prometheus.CounterVec
@@ -153,35 +160,26 @@ func (n *namespaces) query(token string) (data.Set, error) {
 // validate checks the token and returns the namespace it is associated with,
 // or an error if the token is invalid or does not have access to the namespace.
 func (n *namespaces) validate(token string) (string, error) {
-	var claimNamespace string
+	claimNamespace := ""
 	// Get Issuer - token parsing is skipped here, because we only need the issuer
 	// and we don't have the key to verify the signature.
 	tokenJwt, _ := jwt.Parse(token, nil)
 	claims, ok := tokenJwt.Claims.(jwt.MapClaims)
 	issuer, gErr := claims.GetIssuer()
 	if cmp.Or(!ok, gErr != nil) {
-		return "", fmt.Errorf("failed to parse claim JWT token: %s", token)
+		return "", errors.New(fmt.Sprintf("failed to parse claim JWT token: %s", token))
 	}
 
-	clusterName := os.Getenv("CLUSTER_NAME")
 	// investigate token type
-	switch issuer {
-	// bound token
-	case "rke":
+	if issuer == defaultk3s || issuer == defaultRKE || (n.oidc.active && issuer == n.oidc.issuer) {
 		claimNamespace, _ = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
-	// k3s
-	case "https://kubernetes.default.svc.cluster.local":
-		claimNamespace, _ = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
-	// legacy token
-	case "kubernetes/serviceaccount":
+	}
+	if issuer == defaultLegacy {
 		claimNamespace, _ = claims["kubernetes.io/serviceaccount/namespace"].(string)
-	// caas OICD
-	case fmt.Sprintf("https://oidc.caas-%s.telekom.de/", clusterName):
-		claimNamespace, _ = claims["kubernetes.io"].(map[string]interface{})["namespace"].(string)
-	default:
-		log.Errorf("invalid claim type found: %v", claims)
-		n.metrics.IncFailedRequests("")
-		return "", fmt.Errorf("unknown token issuer %s", issuer)
+	}
+	if len(claimNamespace) == 0 {
+		log.Errorf("could not parse namespace from claim: %v", claims)
+		return "", errors.New(fmt.Sprintf("unknown token issuer %s", issuer))
 	}
 
 	_, exist := n.reviewResultTTLCache.Get(token)
@@ -229,7 +227,7 @@ func (n *namespaces) validate(token string) (string, error) {
 	return claimNamespace, nil
 }
 
-func NewNamespaces(ctx context.Context, k8sClient kubernetes.Interface, reg *prometheus.Registry) Namespaces {
+func NewNamespaces(ctx context.Context, k8sClient kubernetes.Interface, oidcIssuer string, reg *prometheus.Registry) Namespaces {
 	// secrets
 	sec := k8sClient.CoreV1().Secrets(meta.NamespaceAll)
 	secListWatch := &clientCache.ListWatch{
@@ -263,7 +261,11 @@ func NewNamespaces(ctx context.Context, k8sClient kubernetes.Interface, reg *pro
 		reviewResultTTLCache:       cache.NewLRUExpireCache(reviewResultCacheSizeBytes),
 		secretIndexer:              secInformer.GetIndexer(),
 		namespaceIndexer:           nsInformer.GetIndexer(),
-		metrics:                    NewMetrics(reg),
+		oidc: oidc{
+			active: len(oidcIssuer) > 0,
+			issuer: oidcIssuer,
+		},
+		metrics: NewMetrics(reg),
 	}
 }
 

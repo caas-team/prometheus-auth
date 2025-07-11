@@ -70,6 +70,11 @@ func main() {
 			Usage: "[optional] Filter out the configured labels when calling '/api/v1/read'",
 			Value: &cli.StringSlice{},
 		},
+		cli.StringFlag{
+			Name:  "oidc-issuer",
+			Usage: "[optional] OIDC issuer URL, used to validate JWT tokens",
+			Value: "",
+		},
 	}
 
 	defer func() {
