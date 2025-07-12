@@ -179,7 +179,7 @@ func createAgent(_ context.Context, cfg *agentConfig) (*agent, error) {
 	// register standard prometheus metrics
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(
-		collectors.NewGoCollector(nil),
+		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
 
