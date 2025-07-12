@@ -1,0 +1,31 @@
+kube-prometheus-stack:
+  prometheus: 
+    prometheusSpec:
+      containers:
+        - args:
+          - --proxy-url=http://127.0.0.1:9090
+          - --listen-address=$(POD_IP):9091
+          - --filter-reader-labels=prometheus
+          - --filter-reader-labels=prometheus_replica
+          - --log.debug=true
+          command:
+            - prometheus-auth
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          image: k3d-registry.localhost:5000/prometheus-auth:dev 
+          name: prometheus-agent
+          ports:
+          - containerPort: 9091
+            name: http-auth
+            protocol: TCP
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 2000Mi
+            requests:
+              cpu: 200m
+              memory: 500Mi
+      

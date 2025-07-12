@@ -177,9 +177,10 @@ func createAgent(_ context.Context, cfg *agentConfig) (*agent, error) {
 	}
 
 	// register standard prometheus metrics
+	log.Debug("Creating prometheus registry")
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(
-		collectors.NewGoCollector(nil),
+		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
 
@@ -189,7 +190,7 @@ func createAgent(_ context.Context, cfg *agentConfig) (*agent, error) {
 	}
 	listener = netutil.LimitListener(listener, cfg.maxConnections)
 
-	// create Kubernetes client
+	log.Debug("creating Kubernetes client")
 	k8sConfig, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, errors.Annotate(err, "unable to create Kubernetes config by InClusterConfig()")
@@ -199,7 +200,7 @@ func createAgent(_ context.Context, cfg *agentConfig) (*agent, error) {
 		return nil, errors.Annotate(err, "unable to new Kubernetes clientSet")
 	}
 
-	// create Prometheus client
+	log.Debug("creating prom client")
 	promClient, err := promapi.NewClient(promapi.Config{
 		Address: cfg.proxyURL.String(),
 	})
@@ -207,7 +208,7 @@ func createAgent(_ context.Context, cfg *agentConfig) (*agent, error) {
 		return nil, errors.Annotate(err, "unable to new Prometheus client")
 	}
 
-	// create tokens client and get userInfo
+	log.Debug("Creating tokens client")
 	tokens := kube.NewTokens(cfg.ctx, k8sClient)
 	userInfo, err := tokens.Authenticate(cfg.myToken)
 	if err != nil {
