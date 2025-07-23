@@ -11,7 +11,7 @@ func NewExprForCountAllLabels(namespaces []string) string {
 }
 
 func NewInstantVectorSelectorsForNamespaces(namespaces []string) string {
-	ret := createMatcher(namespaceMatchName, namespaces)
+	ret := createMatcher(NamespaceMatchName, namespaces)
 
 	return fmt.Sprintf(`{%s}`, ret.String())
 }

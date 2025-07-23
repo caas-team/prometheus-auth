@@ -61,12 +61,12 @@ func hijackFederate(apiCtx *apiContext) error {
 		}
 
 		log.Debugf("raw federate[%s - %d] => %s", apiCtx.tag, idx, rawValue)
-		hjkValue := modifyExpression(expr, apiCtx.namespaceSet)
+		hjkValue := modifyExpression(expr, apiCtx.namespaceSet, prom.NamespaceMatchName)
 		log.Debugf("hjk federate[%s - %d] => %s", apiCtx.tag, idx, hjkValue)
 		queries.Add("match[]", hjkValue)
-		// Add exported_namespace label to the query, to get all metrics with the exported_namespace as well
-		cloned := cloneAndReplaceLabel(expr, "namespace", "exported_namespace")
-		queries.Add("match[]", cloned.String())
+		hjkValue = modifyExpression(expr, apiCtx.namespaceSet, prom.ExportedNamespaceMatchName)
+		log.Debugf("hjk federate[%s - %d] => %s", apiCtx.tag, idx, hjkValue)
+		queries.Add("match[]", hjkValue)
 	}
 
 	// inject
@@ -80,35 +80,6 @@ func hijackFederate(apiCtx *apiContext) error {
 	}
 
 	return apiCtx.proxyWith(newReq)
-}
-
-// cloneAndReplaceLabel clones the given expression and replaces the label
-// `from` with `to` in the cloned expression's label matchers.
-func cloneAndReplaceLabel(expr parser.Expr, from, to string) parser.Expr { //nolint:gocognit // function is not too complex
-	cloned, err := parser.ParseExpr(expr.String())
-	if err == nil {
-		parser.Inspect(cloned, func(node parser.Node, _ []parser.Node) error {
-			switch n := node.(type) {
-			case *parser.VectorSelector:
-				for _, m := range n.LabelMatchers {
-					if m.Name == from {
-						m.Name = to
-					}
-				}
-			case *parser.MatrixSelector:
-				if vs, ok := n.VectorSelector.(*parser.VectorSelector); ok {
-					for _, m := range vs.LabelMatchers {
-						if m.Name == from {
-							m.Name = to
-						}
-					}
-				}
-			}
-			return nil
-		})
-	}
-
-	return cloned
 }
 
 func hijackQuery(apiCtx *apiContext) error {
@@ -165,7 +136,7 @@ func hijackQuery(apiCtx *apiContext) error {
 	// hijack
 	req.Form.Del("query")
 	log.Debugf("raw query[%s - 0] => %s", apiCtx.tag, rawValue)
-	hjkValue := modifyExpression(queryExpr, apiCtx.namespaceSet)
+	hjkValue := modifyExpression(queryExpr, apiCtx.namespaceSet, prom.NamespaceMatchName)
 	log.Debugf("hjk query[%s - 0] => %s", apiCtx.tag, hjkValue)
 	req.Form.Set("query", hjkValue)
 
@@ -263,7 +234,7 @@ func hijackQueryRange(apiCtx *apiContext) error { //nolint:funlen // TODO: refac
 	// hijack
 	req.Form.Del("query")
 	log.Debugf("raw query[%s - 0] => %s", apiCtx.tag, rawValue)
-	hjkValue := modifyExpression(queryExpr, apiCtx.namespaceSet)
+	hjkValue := modifyExpression(queryExpr, apiCtx.namespaceSet, prom.NamespaceMatchName)
 	log.Debugf("hjk query[%s - 0] => %s", apiCtx.tag, hjkValue)
 	req.Form.Set("query", hjkValue)
 
@@ -329,7 +300,7 @@ func hijackSeries(apiCtx *apiContext) error {
 		}
 
 		log.Debugf("raw series[%s - %d] => %s", apiCtx.tag, idx, rawValue)
-		hjkValue := modifyExpression(expr, apiCtx.namespaceSet)
+		hjkValue := modifyExpression(expr, apiCtx.namespaceSet, prom.NamespaceMatchName)
 		log.Debugf("hjk series[%s - %d] => %s", apiCtx.tag, idx, hjkValue)
 
 		queries.Add("match[]", hjkValue)
@@ -482,11 +453,12 @@ func parseDuration(s string) (time.Duration, error) {
 
 // modifyExpression modifies the given PromQL expression by adding a namespace label matcher
 // to the selectors within the expression, to match the passed namespaceSet.
-func modifyExpression(originalExpr parser.Expr, namespaceSet data.Set) string {
-	parser.Inspect(originalExpr, func(node parser.Node, _ []parser.Node) error {
+func modifyExpression(originalExpr parser.Expr, namespaceSet data.Set, labelName string) string {
+	cloned, _ := parser.ParseExpr(originalExpr.String())
+	parser.Inspect(cloned, func(node parser.Node, _ []parser.Node) error {
 		switch n := node.(type) {
 		case *parser.VectorSelector:
-			n.LabelMatchers = prom.FilterMatchers(namespaceSet, n.LabelMatchers)
+			n.LabelMatchers = prom.FilterMatchers(namespaceSet, n.LabelMatchers, labelName)
 		case *parser.MatrixSelector:
 			vs, ok := n.VectorSelector.(*parser.VectorSelector)
 			if !ok {
@@ -499,13 +471,13 @@ func modifyExpression(originalExpr parser.Expr, namespaceSet data.Set) string {
 				log.Errorf("unable to extract vector selector from matrix selector")
 				return nil
 			}
-			vs.LabelMatchers = prom.FilterMatchers(namespaceSet, vs.LabelMatchers)
+			vs.LabelMatchers = prom.FilterMatchers(namespaceSet, vs.LabelMatchers, labelName)
 			n.VectorSelector = vs
 		}
 		return nil
 	})
 
-	return originalExpr.String()
+	return cloned.String()
 }
 
 func modifyQuery(originalQuery *prompb.Query, namespaceSet, filterReaderLabelSet data.Set) *prompb.Query {

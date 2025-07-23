@@ -7,25 +7,24 @@ import (
 )
 
 const (
-	namespaceMatchName = "namespace"
+	NamespaceMatchName         = "namespace"
+	ExportedNamespaceMatchName = "exported_namespace"
 )
 
-// FilterMatchers updates the prometheus matchers to include the "namespace"
-// label matcher.
-// If the namespace match already exists, it will be updated with the
-// provided namespace set.
-func FilterMatchers(namespaceSet data.Set, srcMatchers []*promlb.Matcher) []*promlb.Matcher {
+// FilterMatchers updates the prometheus matchers to include the passed
+// label matcher. If the passed label matches one of the predefined ones,
+// the matchers' value will be updated to contain only the namespaceSet.
+func FilterMatchers(namespaceSet data.Set, srcMatchers []*promlb.Matcher, label string) []*promlb.Matcher {
 	for _, m := range srcMatchers {
 		name := m.Name
 
-		if name == namespaceMatchName {
+		if name == NamespaceMatchName || name == ExportedNamespaceMatchName {
 			translateMatcher(namespaceSet, m)
 			return srcMatchers
 		}
 	}
 
-	// append namespace match
-	srcMatchers = append(srcMatchers, createMatcher(namespaceMatchName, namespaceSet.Values()))
+	srcMatchers = append(srcMatchers, createMatcher(label, namespaceSet.Values()))
 
 	return srcMatchers
 }
@@ -34,14 +33,14 @@ func FilterLabelMatchers(namespaceSet data.Set, srcMatchers []*prompb.LabelMatch
 	for _, m := range srcMatchers {
 		name := m.Name
 
-		if name == namespaceMatchName {
+		if name == NamespaceMatchName {
 			translateLabelMatcher(namespaceSet, m)
 			return srcMatchers
 		}
 	}
 
 	// append namespace match
-	srcMatchers = append(srcMatchers, createLabelMatcher(namespaceMatchName, namespaceSet.Values()))
+	srcMatchers = append(srcMatchers, createLabelMatcher(NamespaceMatchName, namespaceSet.Values()))
 
 	return srcMatchers
 }
