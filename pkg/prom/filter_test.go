@@ -116,7 +116,7 @@ func TestFilterMatchers(t *testing.T) {
 	errs := make([]error, 0, len(metrics))
 	for _, c := range metrics {
 		err := walkExpr(c.name, c.input, c.expect, func(matchers []*labels.Matcher) ([]*labels.Matcher, error) {
-			return FilterMatchers(nsSet, matchers), nil
+			return FilterMatchers(nsSet, matchers, NamespaceMatchName), nil
 		})
 		if err != nil {
 			errs = append(errs, err)
