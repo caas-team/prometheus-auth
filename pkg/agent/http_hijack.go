@@ -480,6 +480,8 @@ func parseDuration(s string) (time.Duration, error) {
 	return 0, errors.Errorf("cannot parse %q to a valid duration", s)
 }
 
+// modifyExpression modifies the given PromQL expression by adding a namespace label matcher
+// to the selectors within the expression, to match the passed namespaceSet.
 func modifyExpression(originalExpr parser.Expr, namespaceSet data.Set) string {
 	parser.Inspect(originalExpr, func(node parser.Node, _ []parser.Node) error {
 		switch n := node.(type) {

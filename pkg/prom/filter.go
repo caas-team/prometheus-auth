@@ -10,6 +10,10 @@ const (
 	namespaceMatchName = "namespace"
 )
 
+// FilterMatchers updates the prometheus matchers to include the "namespace"
+// label matcher.
+// If the namespace match already exists, it will be updated with the
+// provided namespace set.
 func FilterMatchers(namespaceSet data.Set, srcMatchers []*promlb.Matcher) []*promlb.Matcher {
 	for _, m := range srcMatchers {
 		name := m.Name
