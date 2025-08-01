@@ -17,6 +17,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/juju/errors"
 	"github.com/prometheus/prometheus/promql/promqltest"
 
@@ -215,13 +217,14 @@ func Test_accessControl(t *testing.T) {
 	// the contents of the prom TSDB
 	input := `
 		load 1m
-			test_metric1{namespace="ns-a",foo="bar"}    	0+100x100
-			test_metric1{namespace="ns-c",foo="boo"}    	1+0x100
-			test_metric2{foo="boo"}    						1+0x100
-			test_cluster_wide_metric{namespace="caasglobal"} 1+0x100
-			test_metric_without_labels 						1+10x100
-			test_metric_stale                      	 		1+10x99 stale
-			test_metric_old                         		1+10x98
+			test_metric1{namespace="ns-a",foo="bar"}    		0+100x100
+			test_metric1{namespace="ns-c",foo="boo"}    	    1+0x100
+			test_metric2{foo="boo"}    						    1+0x100
+			test_cluster_wide_metric{namespace="caasglobal"}    1+0x100
+			test_metric3_exported_ns{namespace="some-central-operator",exported_namespace="ns-a"} 1+0x100
+			test_metric_without_labels 							1+10x100
+			test_metric_stale                      	 			1+10x99 stale
+			test_metric_old                         			1+10x98
 	`
 	storage := promqltest.LoadedStorage(t, input)
 	engine := promql.NewEngine(promql.EngineOpts{
@@ -395,6 +398,8 @@ func mockAgent(t *testing.T) *agent {
 		t.Error(err)
 	}
 
+	registry := prometheus.NewRegistry()
+
 	return &agent{
 		cfg: agtCfg,
 		userInfo: authentication.UserInfo{
@@ -404,6 +409,7 @@ func mockAgent(t *testing.T) *agent {
 		namespaces: mockOwnedNamespaces(),
 		tokens:     mockTokenAuth(),
 		remoteAPI:  promapiv1.NewAPI(promClient),
+		registry:   registry,
 	}
 }
 
@@ -447,7 +453,7 @@ func (v ScenarioValidator) Validate(t *testing.T, handler http.Handler) {
 }
 
 func (v ScenarioValidator) executeRequest(t *testing.T, handler http.Handler) *httptest.ResponseRecorder {
-	url := "http://localhost:9090" // base url that federator is expected to be hosted at
+	uri := "http://localhost:9090" // base url that federator is expected to be hosted at
 	headers := map[string]string{
 		authorizationHeaderKey: fmt.Sprintf("Bearer %s", v.Token),
 	}
@@ -457,7 +463,7 @@ func (v ScenarioValidator) executeRequest(t *testing.T, handler http.Handler) *h
 	case FederateScenario:
 		switch v.Method {
 		case http.MethodGet:
-			url = fmt.Sprintf("%s/federate?%s", url, v.Scenario.Queries.Encode())
+			uri = fmt.Sprintf("%s/federate?%s", uri, v.Scenario.Queries.Encode())
 		default:
 			t.Errorf("[%s] [%s] token %q scenario %q: cannot identify URL to send request", v.Type, v.Method, v.Token, v.Name)
 			return nil
@@ -465,7 +471,7 @@ func (v ScenarioValidator) executeRequest(t *testing.T, handler http.Handler) *h
 	case LabelScenario:
 		switch v.Method {
 		case http.MethodGet:
-			url = fmt.Sprintf("%s/api/v1/label/%s/values", url, v.Scenario.Params["name"])
+			uri = fmt.Sprintf("%s/api/v1/label/%s/values", uri, v.Scenario.Params["name"])
 		default:
 			t.Errorf("[%s] [%s] token %q scenario %q: cannot identify URL to send request", v.Type, v.Method, v.Token, v.Name)
 			return nil
@@ -473,9 +479,9 @@ func (v ScenarioValidator) executeRequest(t *testing.T, handler http.Handler) *h
 	case QueryScenario:
 		switch v.Method {
 		case http.MethodGet:
-			url = fmt.Sprintf("%s/api/v1%s?%s", url, v.Scenario.Endpoint, v.Scenario.Queries.Encode())
+			uri = fmt.Sprintf("%s/api/v1%s?%s", uri, v.Scenario.Endpoint, v.Scenario.Queries.Encode())
 		case http.MethodPost:
-			url = fmt.Sprintf("%s/api/v1%s", url, v.Scenario.Endpoint)
+			uri = fmt.Sprintf("%s/api/v1%s", uri, v.Scenario.Endpoint)
 			body = strings.NewReader(v.Scenario.Queries.Encode())
 			headers["Content-Type"] = "application/x-www-form-urlencoded"
 		default:
@@ -485,7 +491,7 @@ func (v ScenarioValidator) executeRequest(t *testing.T, handler http.Handler) *h
 	case ReadScenario:
 		switch v.Method {
 		case http.MethodPost:
-			url = fmt.Sprintf("%s/api/v1/read", url)
+			uri = fmt.Sprintf("%s/api/v1/read", uri)
 			// raw -> proto request
 			protoReq := &prompb.ReadRequest{Queries: v.Scenario.PrompbQueries}
 			protoReqData, err := proto.Marshal(protoReq)
@@ -501,7 +507,7 @@ func (v ScenarioValidator) executeRequest(t *testing.T, handler http.Handler) *h
 	case SeriesScenario:
 		switch v.Method {
 		case http.MethodGet:
-			url = fmt.Sprintf("%s/api/v1/series?%s", url, v.Scenario.Queries.Encode())
+			uri = fmt.Sprintf("%s/api/v1/series?%s", uri, v.Scenario.Queries.Encode())
 		default:
 			t.Errorf("[%s] [%s] token %q scenario %q: cannot identify URL to send request", v.Type, v.Method, v.Token, v.Name)
 			return nil
@@ -512,7 +518,7 @@ func (v ScenarioValidator) executeRequest(t *testing.T, handler http.Handler) *h
 	}
 
 	// Execute request
-	req := httptest.NewRequest(v.Method, url, body)
+	req := httptest.NewRequest(v.Method, uri, body)
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}

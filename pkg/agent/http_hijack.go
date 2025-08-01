@@ -24,20 +24,23 @@ import (
 
 // the global namespace to add to all hijacked queries
 // to allow users to get some global metrics.
-const globalNamespace = "caasglobal"
+const (
+	globalNamespace     = "caasglobal"
+	maxResolutionPoints = 11000
+)
 
 func hijackFederate(apiCtx *apiContext) error {
 	// pre check
 	queries, err := url.ParseQuery(apiCtx.request.URL.RawQuery)
 	if err != nil {
-		return errors.Wrap(err, badRequestErr)
+		return errors.Wrap(err, errBadRequest)
 	}
 
 	matchFormValues := queries["match[]"]
 	for _, rawValue := range matchFormValues {
-		_, err := parser.ParseMetricSelector(rawValue)
+		_, err = parser.ParseMetricSelector(rawValue)
 		if err != nil {
-			return errors.Wrap(err, badRequestErr)
+			return errors.Wrap(err, errBadRequest)
 		}
 	}
 
@@ -52,15 +55,17 @@ func hijackFederate(apiCtx *apiContext) error {
 	// hijack
 	queries.Del("match[]")
 	for idx, rawValue := range matchFormValues {
-		expr, err := parser.ParseExpr(rawValue)
-		if err != nil {
-			return errors.Wrap(err, badRequestErr)
+		expr, pErr := parser.ParseExpr(rawValue)
+		if pErr != nil {
+			return errors.Wrap(pErr, errBadRequest)
 		}
 
 		log.Debugf("raw federate[%s - %d] => %s", apiCtx.tag, idx, rawValue)
-		hjkValue := modifyExpression(expr, apiCtx.namespaceSet)
+		hjkValue := modifyExpression(expr, apiCtx.namespaceSet, prom.NamespaceMatchName)
 		log.Debugf("hjk federate[%s - %d] => %s", apiCtx.tag, idx, hjkValue)
-
+		queries.Add("match[]", hjkValue)
+		hjkValue = modifyExpression(expr, apiCtx.namespaceSet, prom.ExportedNamespaceMatchName)
+		log.Debugf("hjk federate[%s - %d] => %s", apiCtx.tag, idx, hjkValue)
 		queries.Add("match[]", hjkValue)
 	}
 
@@ -69,9 +74,9 @@ func hijackFederate(apiCtx *apiContext) error {
 	reqURL.RawQuery = queries.Encode()
 
 	// proxy
-	newReq, err := http.NewRequest(http.MethodGet, reqURL.String(), nil)
+	newReq, err := http.NewRequestWithContext(apiCtx.request.Context(), http.MethodGet, reqURL.String(), nil)
 	if err != nil {
-		return errors.Wrap(err, internalErr)
+		return errors.Wrap(err, errInternal)
 	}
 
 	return apiCtx.proxyWith(newReq)
@@ -84,19 +89,19 @@ func hijackQuery(apiCtx *apiContext) error {
 	// pre check
 	if to := req.FormValue("timeout"); len(to) != 0 {
 		if _, err := parseDuration(to); err != nil {
-			return errors.Wrap(err, badRequestErr)
+			return errors.Wrap(err, errBadRequest)
 		}
 	}
 
 	queryFormValue := req.FormValue("query")
 	if len(queryFormValue) == 0 {
-		return errors.Wrap(errors.New("unable to get 'query' value from request"), badRequestErr)
+		return errors.Wrap(errors.New("unable to get 'query' value from request"), errBadRequest)
 	}
 
 	rawValue := queryFormValue
 	queryExpr, err := parser.ParseExpr(rawValue)
 	if err != nil {
-		return errors.Wrap(err, badRequestErr)
+		return errors.Wrap(err, errBadRequest)
 	}
 
 	// quick response
@@ -105,13 +110,13 @@ func hijackQuery(apiCtx *apiContext) error {
 
 		if queryExpr.Type() != parser.ValueTypeScalar {
 			var val parser.Value
-			switch queryExpr.Type() {
+			switch queryExpr.Type() { //nolint:exhaustive // handle non-supported types in default
 			case parser.ValueTypeVector:
 				val = make(promql.Vector, 0)
 			case parser.ValueTypeMatrix:
 				val = promql.Matrix{}
 			default:
-				return errors.Wrap(errors.Errorf("unexpected expression type %q", queryExpr.Type()), badRequestErr)
+				return errors.Wrap(errors.Errorf("unexpected expression type %q", queryExpr.Type()), errBadRequest)
 			}
 
 			emptyRespData := struct {
@@ -131,7 +136,7 @@ func hijackQuery(apiCtx *apiContext) error {
 	// hijack
 	req.Form.Del("query")
 	log.Debugf("raw query[%s - 0] => %s", apiCtx.tag, rawValue)
-	hjkValue := modifyExpression(queryExpr, apiCtx.namespaceSet)
+	hjkValue := modifyExpression(queryExpr, apiCtx.namespaceSet, prom.NamespaceMatchName)
 	log.Debugf("hjk query[%s - 0] => %s", apiCtx.tag, hjkValue)
 	req.Form.Set("query", hjkValue)
 
@@ -140,61 +145,61 @@ func hijackQuery(apiCtx *apiContext) error {
 	reqURL.RawQuery = req.Form.Encode()
 
 	// proxy
-	newReq, err := http.NewRequest(http.MethodGet, reqURL.String(), nil)
+	newReq, err := http.NewRequestWithContext(apiCtx.request.Context(), http.MethodGet, reqURL.String(), nil)
 	if err != nil {
-		return errors.Wrap(err, internalErr)
+		return errors.Wrap(err, errInternal)
 	}
 
 	return apiCtx.proxyWith(newReq)
 }
 
-func hijackQueryRange(apiCtx *apiContext) error {
+func hijackQueryRange(apiCtx *apiContext) error { //nolint:funlen // TODO: refactor and simplify
 	req := apiCtx.request
 	apiCtx.response.Header().Set("Content-Type", "application/json")
 
 	// pre check
 	if to := req.FormValue("timeout"); len(to) != 0 {
 		if _, err := parseDuration(to); err != nil {
-			return errors.Wrap(err, badRequestErr)
+			return errors.Wrap(err, errBadRequest)
 		}
 	}
 
 	start, err := parseTime(req.FormValue("start"))
 	if err != nil {
-		return errors.Wrap(err, badRequestErr)
+		return errors.Wrap(err, errBadRequest)
 	}
 
 	end, err := parseTime(req.FormValue("end"))
 	if err != nil {
-		return errors.Wrap(err, badRequestErr)
+		return errors.Wrap(err, errBadRequest)
 	}
 
 	if end.Before(start) {
-		return errors.Wrap(errors.New("end timestamp must not be before start time"), badRequestErr)
+		return errors.Wrap(errors.New("end timestamp must not be before start time"), errBadRequest)
 	}
 
 	step, err := parseDuration(req.FormValue("step"))
 	if err != nil {
-		return errors.Wrap(err, badRequestErr)
+		return errors.Wrap(err, errBadRequest)
 	}
 
 	if step <= 0 {
-		return errors.Wrap(errors.New("zero or negative query resolution step widths are not accepted. Try a positive integer"), badRequestErr)
+		return errors.Wrap(errors.New("zero or negative query resolution step widths are not accepted. Try a positive integer"), errBadRequest)
 	}
 
-	if end.Sub(start)/step > 11000 {
-		return errors.Wrap(errors.New("exceeded maximum resolution of 11,000 points per timeseries. Try decreasing the query resolution (?step=XX)"), badRequestErr)
+	if end.Sub(start)/step > maxResolutionPoints {
+		return errors.Wrap(errors.New("exceeded maximum resolution of 11,000 points per timeseries. Try decreasing the query resolution (?step=XX)"), errBadRequest)
 	}
 
 	queryFormValue := req.FormValue("query")
 	if len(queryFormValue) == 0 {
-		return errors.Wrap(errors.New("unable to get 'query' value from request"), badRequestErr)
+		return errors.Wrap(errors.New("unable to get 'query' value from request"), errBadRequest)
 	}
 
 	rawValue := queryFormValue
 	queryExpr, err := parser.ParseExpr(rawValue)
 	if err != nil {
-		return errors.Wrap(err, badRequestErr)
+		return errors.Wrap(err, errBadRequest)
 	}
 
 	// quick response
@@ -203,13 +208,13 @@ func hijackQueryRange(apiCtx *apiContext) error {
 
 		if queryExpr.Type() != parser.ValueTypeScalar {
 			var val parser.Value
-			switch queryExpr.Type() {
+			switch queryExpr.Type() { //nolint:exhaustive // handle non-supported types in default
 			case parser.ValueTypeVector:
 				val = promql.Matrix{}
 			case parser.ValueTypeMatrix:
 				val = promql.Matrix{}
 			default:
-				return errors.Wrap(errors.Errorf("unexpected expression type %q", queryExpr.Type()), badRequestErr)
+				return errors.Wrap(errors.Errorf("unexpected expression type %q", queryExpr.Type()), errBadRequest)
 			}
 
 			emptyRespData := struct {
@@ -229,7 +234,7 @@ func hijackQueryRange(apiCtx *apiContext) error {
 	// hijack
 	req.Form.Del("query")
 	log.Debugf("raw query[%s - 0] => %s", apiCtx.tag, rawValue)
-	hjkValue := modifyExpression(queryExpr, apiCtx.namespaceSet)
+	hjkValue := modifyExpression(queryExpr, apiCtx.namespaceSet, prom.NamespaceMatchName)
 	log.Debugf("hjk query[%s - 0] => %s", apiCtx.tag, hjkValue)
 	req.Form.Set("query", hjkValue)
 
@@ -238,9 +243,9 @@ func hijackQueryRange(apiCtx *apiContext) error {
 	reqURL.RawQuery = req.Form.Encode()
 
 	// proxy
-	newReq, err := http.NewRequest(http.MethodGet, reqURL.String(), nil)
+	newReq, err := http.NewRequestWithContext(apiCtx.request.Context(), http.MethodGet, reqURL.String(), nil)
 	if err != nil {
-		return errors.Wrap(err, internalErr)
+		return errors.Wrap(err, errInternal)
 	}
 
 	return apiCtx.proxyWith(newReq)
@@ -252,30 +257,30 @@ func hijackSeries(apiCtx *apiContext) error {
 	// pre check
 	queries, err := url.ParseQuery(apiCtx.request.URL.RawQuery)
 	if err != nil {
-		return errors.Wrap(err, badRequestErr)
+		return errors.Wrap(err, errBadRequest)
 	}
 
 	if t := queries.Get("start"); t != "" {
-		if _, err := parseTime(t); err != nil {
-			return errors.Wrap(err, badRequestErr)
+		if _, err = parseTime(t); err != nil {
+			return errors.Wrap(err, errBadRequest)
 		}
 	}
 
 	if t := queries.Get("end"); t != "" {
-		if _, err := parseTime(t); err != nil {
-			return errors.Wrap(err, badRequestErr)
+		if _, err = parseTime(t); err != nil {
+			return errors.Wrap(err, errBadRequest)
 		}
 	}
 
 	matchFormValues := queries["match[]"]
 	if len(matchFormValues) == 0 {
-		return errors.Wrap(errors.New("no match[] parameter provided"), badRequestErr)
+		return errors.Wrap(errors.New("no match[] parameter provided"), errBadRequest)
 	}
 
 	for _, rawValue := range matchFormValues {
-		_, err := parser.ParseMetricSelector(rawValue)
+		_, err = parser.ParseMetricSelector(rawValue)
 		if err != nil {
-			return errors.Wrap(err, badRequestErr)
+			return errors.Wrap(err, errBadRequest)
 		}
 	}
 
@@ -289,13 +294,13 @@ func hijackSeries(apiCtx *apiContext) error {
 	// hijack
 	queries.Del("match[]")
 	for idx, rawValue := range matchFormValues {
-		expr, err := parser.ParseExpr(rawValue)
-		if err != nil {
-			return errors.Wrap(err, badRequestErr)
+		expr, pErr := parser.ParseExpr(rawValue)
+		if pErr != nil {
+			return errors.Wrap(pErr, errBadRequest)
 		}
 
 		log.Debugf("raw series[%s - %d] => %s", apiCtx.tag, idx, rawValue)
-		hjkValue := modifyExpression(expr, apiCtx.namespaceSet)
+		hjkValue := modifyExpression(expr, apiCtx.namespaceSet, prom.NamespaceMatchName)
 		log.Debugf("hjk series[%s - %d] => %s", apiCtx.tag, idx, hjkValue)
 
 		queries.Add("match[]", hjkValue)
@@ -306,9 +311,9 @@ func hijackSeries(apiCtx *apiContext) error {
 	reqURL.RawQuery = queries.Encode()
 
 	// proxy
-	newReq, err := http.NewRequest(http.MethodGet, reqURL.String(), nil)
+	newReq, err := http.NewRequestWithContext(apiCtx.request.Context(), http.MethodGet, reqURL.String(), nil)
 	if err != nil {
-		return errors.Wrap(err, internalErr)
+		return errors.Wrap(err, errInternal)
 	}
 
 	return apiCtx.proxyWith(newReq)
@@ -320,7 +325,7 @@ func hijackRead(apiCtx *apiContext) error {
 	// pre check
 	pbreq, err := remote.DecodeReadRequest(req)
 	if err != nil {
-		return errors.Wrap(err, badRequestErr)
+		return errors.Wrap(err, errBadRequest)
 	}
 
 	rawQueries := pbreq.Queries
@@ -355,14 +360,14 @@ func hijackRead(apiCtx *apiContext) error {
 	// inject
 	marshaledData, err := pbreq.Marshal()
 	if err != nil {
-		return errors.Wrap(err, badRequestErr)
+		return errors.Wrap(err, errBadRequest)
 	}
 	compressedData := snappy.Encode(nil, marshaledData)
 
 	// proxy
-	newReq, err := http.NewRequest(http.MethodPost, req.URL.String(), bytes.NewBuffer(compressedData))
+	newReq, err := http.NewRequestWithContext(apiCtx.request.Context(), http.MethodPost, req.URL.String(), bytes.NewBuffer(compressedData))
 	if err != nil {
-		return errors.Wrap(err, internalErr)
+		return errors.Wrap(err, errInternal)
 	}
 
 	return apiCtx.proxyWith(newReq)
@@ -403,12 +408,12 @@ func hijackLabelName(apiCtx *apiContext) error {
 		log.Debugf("received warning on query: %s", warn)
 	}
 	if err != nil {
-		return errors.Wrap(err, notProvisionedErr)
+		return errors.Wrap(err, errNotProvisioned)
 	}
 
 	vectorVals, ok := vals.(prommodel.Vector)
 	if !ok {
-		return errors.Wrap(err, notProvisionedErr)
+		return errors.Wrap(err, errNotProvisioned)
 	}
 
 	hjkValues := make(prommodel.LabelValues, 0, len(vectorVals))
@@ -446,11 +451,14 @@ func parseDuration(s string) (time.Duration, error) {
 	return 0, errors.Errorf("cannot parse %q to a valid duration", s)
 }
 
-func modifyExpression(originalExpr parser.Expr, namespaceSet data.Set) string {
-	parser.Inspect(originalExpr, func(node parser.Node, _ []parser.Node) error {
+// modifyExpression modifies the given PromQL expression by adding a namespace label matcher
+// to the selectors within the expression, to match the passed namespaceSet.
+func modifyExpression(originalExpr parser.Expr, namespaceSet data.Set, labelName string) string {
+	cloned, _ := parser.ParseExpr(originalExpr.String())
+	parser.Inspect(cloned, func(node parser.Node, _ []parser.Node) error {
 		switch n := node.(type) {
 		case *parser.VectorSelector:
-			n.LabelMatchers = prom.FilterMatchers(namespaceSet, n.LabelMatchers)
+			n.LabelMatchers = prom.FilterMatchers(namespaceSet, n.LabelMatchers, labelName)
 		case *parser.MatrixSelector:
 			vs, ok := n.VectorSelector.(*parser.VectorSelector)
 			if !ok {
@@ -463,16 +471,16 @@ func modifyExpression(originalExpr parser.Expr, namespaceSet data.Set) string {
 				log.Errorf("unable to extract vector selector from matrix selector")
 				return nil
 			}
-			vs.LabelMatchers = prom.FilterMatchers(namespaceSet, vs.LabelMatchers)
+			vs.LabelMatchers = prom.FilterMatchers(namespaceSet, vs.LabelMatchers, labelName)
 			n.VectorSelector = vs
 		}
 		return nil
 	})
 
-	return originalExpr.String()
+	return cloned.String()
 }
 
-func modifyQuery(originalQuery *prompb.Query, namespaceSet, filterReaderLabelSet data.Set) (modifiedQuery *prompb.Query) {
+func modifyQuery(originalQuery *prompb.Query, namespaceSet, filterReaderLabelSet data.Set) *prompb.Query {
 	rawMatchers := originalQuery.GetMatchers()
 	filteredMatchers := make([]*prompb.LabelMatcher, 0, len(rawMatchers))
 	for _, rawMatcher := range rawMatchers {

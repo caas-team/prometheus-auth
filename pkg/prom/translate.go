@@ -9,6 +9,8 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 )
 
+// translateMatcher updates the prometheus matcher's value
+// to include the namespace set, depending on the matcher type.
 func translateMatcher(namespaceSet data.Set, srcMatcher *promlb.Matcher) {
 	if namespaceSet == nil || srcMatcher == nil {
 		return

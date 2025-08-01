@@ -13,6 +13,7 @@ import (
 
 const (
 	authorizationHeaderKey = "Authorization"
+	tableSize              = uint32(4 << 10) // 4 KiB
 )
 
 func createHTTPListener(mux cmux.CMux) net.Listener {
@@ -39,14 +40,15 @@ func hasHTTP2Preface(r io.Reader) bool {
 	return string(b[:]) == http2.ClientPreface
 }
 
-func http2HeaderFieldEqual(nameValuePairs map[string]string) cmux.Matcher {
-	return func(r io.Reader) (matched bool) {
+func http2HeaderFieldEqual(nameValuePairs map[string]string) cmux.Matcher { //nolint:gocognit // function is fine
+	return func(r io.Reader) bool {
 		if !hasHTTP2Preface(r) {
 			return false
 		}
 
+		var matched bool
 		framer := http2.NewFramer(io.Discard, r)
-		hdec := hpack.NewDecoder(uint32(4<<10), func(hf hpack.HeaderField) {
+		hdec := hpack.NewDecoder(tableSize, func(hf hpack.HeaderField) {
 			for name, value := range nameValuePairs {
 				matched = strings.EqualFold(hf.Name, name) && hf.Value == value
 				if !matched {
@@ -61,7 +63,7 @@ func http2HeaderFieldEqual(nameValuePairs map[string]string) cmux.Matcher {
 			}
 
 			if f, ok := f.(*http2.HeadersFrame); ok {
-				if _, err := hdec.Write(f.HeaderBlockFragment()); err != nil {
+				if _, err = hdec.Write(f.HeaderBlockFragment()); err != nil {
 					return false
 				}
 				if matched {

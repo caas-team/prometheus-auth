@@ -3,8 +3,11 @@ FROM golang:1.24 AS build-env
 WORKDIR /app
 COPY . .
 
+ARG VERSION
+ARG HASH
+
 RUN go mod tidy && \
-    CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o bin/prometheus-auth cmd/main.go
+    CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -ldflags "-X 'main.VER=${VERSION}' -X 'main.HASH=${HASH}'" -o bin/prometheus-auth cmd/main.go
 
 
 FROM alpine:latest

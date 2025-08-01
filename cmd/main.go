@@ -12,8 +12,13 @@ import (
 )
 
 var (
-	VER  = "dev"
-	HASH = "-"
+	VER  = "dev" //nolint:gochecknoglobals // set by build
+	HASH = "-"   //nolint:gochecknoglobals // set by build
+)
+
+const (
+	readTimeout    = 5 * time.Minute
+	maxConnections = 512
 )
 
 func main() {
@@ -53,12 +58,12 @@ func main() {
 		cli.DurationFlag{
 			Name:  "read-timeout",
 			Usage: "[optional] Maximum duration before timing out read of the request, and closing idle connections",
-			Value: 5 * time.Minute,
+			Value: readTimeout,
 		},
 		cli.IntFlag{
 			Name:  "max-connections",
 			Usage: "[optional] Maximum number of simultaneous connections",
-			Value: 512,
+			Value: maxConnections,
 		},
 		cli.StringSliceFlag{
 			Name:  "filter-reader-labels",
@@ -88,8 +93,8 @@ func main() {
 
 		if context.Bool("log.debug") {
 			log.SetLevel(log.DebugLevel)
-			runtime.SetBlockProfileRate(20)
-			runtime.SetMutexProfileFraction(20)
+			runtime.SetBlockProfileRate(20)     //nolint:mnd // debugging purposes
+			runtime.SetMutexProfileFraction(20) //nolint:mnd // debugging purposes
 		}
 
 		log.SetOutput(os.Stdout)

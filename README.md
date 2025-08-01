@@ -73,7 +73,7 @@ The `agent/test` folder contains the various `Scenario` structs for each Hijack 
 
 - NoneNamespacesToken: the token used to query the API is not associated with any namespace
 - SomeNamespacesToken: the token used to query the API is associated with some namespaces
-- MyToken: the token used to query the API is associated with all namespaces (i.e. the token is a cluster-admin)
+- MyToken: the token used to query the API is associated with all namespaces (i.e., the token is a cluster-admin)
 
 The `http_test.go` file contains the tests themselves, as well as the initialization of the TSDB with the metrics
 present.

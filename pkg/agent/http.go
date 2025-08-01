@@ -31,7 +31,12 @@ func (a *agent) httpBackend() http.Handler {
 	}
 
 	// enable metrics
-	router.Path("/_/metrics").Methods("GET").Handler(promhttp.Handler())
+	router.Path("/_/metrics").Methods("GET").Handler(promhttp.HandlerFor(
+		a.registry,
+		promhttp.HandlerOpts{
+			Registry: a.registry,
+		},
+	))
 
 	// proxy white list
 	router.Path("/alerts").Methods("GET").Handler(proxy)
@@ -109,7 +114,7 @@ func accessControl(agt *agent, proxyHandler http.Handler) http.Handler {
 	router.Path("/api/v1/label/{name}/values").Methods("GET").Handler(proxyHandler)
 	router.Path("/federate").Methods("GET").Handler(apiContextHandler(hijackFederate))
 
-	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	})
 

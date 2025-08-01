@@ -49,6 +49,9 @@ jobs:
         id: build-and-push
         with:
           file: ./Dockerfile
+          build-args: |
+            VERSION: ${{ github.ref_name }}
+            HASH: ${{ github.sha }}
           platforms: linux/amd64
           push: true
           tags: |
