@@ -12,7 +12,8 @@ permissions:
 
 env:
   IMAGE_NAME: prometheus-auth
-  MTR_REPO: mtr.devops.telekom.de/caas
+  ARTIFACTORY_REGISTRY: artifactory.devops.telekom.de
+  ARTIFACTORY_REPO: artifactory.devops.telekom.de/caas-imagetransfers-oci-local
 
 jobs:
   build:
@@ -28,19 +29,19 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Login to MTR
+      - name: Login to Artifactory
         uses: docker/login-action@v3
         with:
-          registry: mtr.devops.telekom.de
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: ${{ env.ARTIFACTORY_REGISTRY }}
+          username: ${{ secrets.ARTIFACTORY_USERNAME }}
+          password: ${{ secrets.ARTIFACTORY_PASSWORD }}
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
               ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}
-              ${{ env.MTR_REPO }}/${{env.IMAGE_NAME}}
+              ${{ env.ARTIFACTORY_REPO }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
             type=sha
