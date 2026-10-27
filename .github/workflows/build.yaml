@@ -13,7 +13,7 @@ permissions:
 env:
   IMAGE_NAME: prometheus-auth
   ARTIFACTORY_REGISTRY: artifactory.devops.telekom.de
-  ARTIFACTORY_REPO: artifactory.devops.telekom.de/caas-imagetransfers-oci-local
+  ARTIFACTORY_REPO: artifactory.devops.telekom.de/caas-imagetransfers-oci-local/caas
 
 jobs:
   build:
